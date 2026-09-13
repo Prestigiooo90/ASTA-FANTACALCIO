@@ -1,0 +1,1187 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#111827" />
+<title>Asta Fantacalcio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E⚽%3C/text%3E%3C/svg%3E" />
+<style>
+  /* =========================================================
+     Asta Fantacalcio — foglio di stile
+     ========================================================= */
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --text: #111827;
+    --muted: #6b7280;
+    --primary: #111827;
+    --accent: #10b981;
+    --accent-2: #059669;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --info: #3b82f6;
+    --role-P: #f59e0b;
+    --role-D: #22c55e;
+    --role-C: #3b82f6;
+    --role-A: #ef4444;
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 1px 3px rgba(0,0,0,.06);
+    --shadow-lg: 0 10px 30px rgba(0,0,0,.15);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.4;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  button { font: inherit; cursor: pointer; }
+  input, select { font: inherit; }
+
+  /* ---------- Layout ---------- */
+  .app { max-width: 1400px; margin: 0 auto; }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 30;
+    background: var(--primary); color: #fff;
+    padding: 10px 12px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #000;
+    padding-top: calc(10px + env(safe-area-inset-top));
+  }
+  .topbar h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .2px; }
+  .topbar .spacer { flex: 1; }
+  .topbar .icon-btn {
+    background: rgba(255,255,255,.08);
+    color: #fff; border: 0;
+    padding: 6px 10px; border-radius: 6px;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px;
+  }
+  .topbar .icon-btn:hover { background: rgba(255,255,255,.15); }
+  .topbar .icon-btn[disabled] { opacity: .4; cursor: not-allowed; }
+
+  .tabs {
+    display: flex; background: #1f2937; color: #e5e7eb;
+    position: sticky; top: 0; z-index: 20;
+    top: calc(48px + env(safe-area-inset-top));
+  }
+  .tabs button {
+    flex: 1; background: transparent; color: inherit; border: 0;
+    padding: 12px 8px; font-size: 14px; font-weight: 500;
+    border-bottom: 2px solid transparent;
+  }
+  .tabs button.active { color: #fff; border-bottom-color: var(--accent); }
+  .tabs button:hover { background: rgba(255,255,255,.05); }
+
+  main { padding: 12px; }
+
+  /* ---------- Setup ---------- */
+  .setup-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+    box-shadow: var(--shadow); margin-bottom: 12px;
+  }
+  .setup-card h2 { margin: 0 0 8px 0; font-size: 16px; }
+  .setup-card p { margin: 4px 0 12px 0; color: var(--muted); font-size: 13px; }
+
+  .team-inputs { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+  .team-inputs label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+  .team-inputs input {
+    padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: #fff; color: var(--text); font-size: 14px;
+  }
+
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .row.between { justify-content: space-between; }
+  .btn {
+    background: var(--primary); color: #fff; border: 0;
+    padding: 10px 14px; border-radius: var(--radius-sm);
+    font-weight: 500; font-size: 14px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.secondary { background: #fff; color: var(--text); border: 1px solid var(--border); }
+  .btn.accent { background: var(--accent); }
+  .btn.accent:hover { background: var(--accent-2); }
+  .btn.danger { background: var(--danger); }
+  .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn[disabled] { opacity: .5; cursor: not-allowed; }
+
+  input[type="number"] { -moz-appearance: textfield; }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+  /* ---------- Giocatori ---------- */
+  .role-tabs { display: flex; gap: 6px; margin: 4px 0 10px; overflow-x: auto; }
+  .role-tabs button {
+    background: #fff; border: 1px solid var(--border); color: var(--text);
+    padding: 8px 12px; border-radius: 999px; font-size: 13px; font-weight: 500;
+    white-space: nowrap;
+  }
+  .role-tabs button.active {
+    background: var(--primary); color: #fff; border-color: var(--primary);
+  }
+  .role-tabs .count { opacity: .7; margin-left: 4px; font-size: 12px; }
+
+  .search {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); background: #fff; font-size: 14px;
+    margin-bottom: 10px;
+  }
+
+  .player-list { display: grid; grid-template-columns: 1fr; gap: 6px; }
+  .player-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 10px 12px;
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer; transition: transform .04s ease, border-color .1s ease;
+  }
+  .player-card:hover { border-color: #9ca3af; }
+  .player-card:active { transform: scale(.99); }
+  .role-badge {
+    width: 30px; height: 30px; border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 13px; flex-shrink: 0;
+  }
+  .role-badge.P { background: var(--role-P); }
+  .role-badge.D { background: var(--role-D); }
+  .role-badge.C { background: var(--role-C); }
+  .role-badge.A { background: var(--role-A); }
+  .player-info { flex: 1; min-width: 0; }
+  .player-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .player-meta { font-size: 12px; color: var(--muted); }
+  .qta-badge {
+    background: #f3f4f6; color: var(--text);
+    padding: 4px 10px; border-radius: 999px; font-weight: 600; font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .empty {
+    text-align: center; color: var(--muted); font-size: 13px;
+    padding: 24px 12px;
+  }
+
+  /* ---------- Squadre ---------- */
+  .view-toggle { display: inline-flex; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+  .view-toggle button { background: transparent; border: 0; padding: 7px 12px; font-size: 13px; }
+  .view-toggle button.active { background: var(--primary); color: #fff; }
+
+  .teams-strip {
+    display: flex; gap: 10px; overflow-x: auto;
+    padding: 4px 4px 12px 4px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .team-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px;
+    min-width: 260px; max-width: 300px; flex-shrink: 0;
+    scroll-snap-align: start;
+    box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .team-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .team-name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .budget {
+    font-weight: 700; font-size: 15px;
+    padding: 2px 8px; border-radius: 6px;
+    background: #ecfdf5; color: var(--accent-2);
+  }
+  .budget.low { background: #fef3c7; color: #92400e; }
+  .budget.critical { background: #fee2e2; color: #991b1b; }
+
+  .slot-row { display: flex; gap: 6px; }
+  .slot-chip {
+    flex: 1; text-align: center;
+    padding: 4px 4px; border-radius: 6px;
+    font-size: 12px; font-weight: 600;
+    background: #f3f4f6; color: var(--text);
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  .slot-chip.full { background: #d1fae5; color: var(--accent-2); }
+  .slot-chip .role { font-size: 10px; font-weight: 700; letter-spacing: .5px; color: var(--muted); }
+  .slot-chip.full .role { color: var(--accent-2); }
+
+  .max-bid { font-size: 12px; color: var(--muted); text-align: center; padding: 4px 0; border-top: 1px dashed var(--border); border-bottom: 1px dashed var(--border); }
+  .max-bid strong { color: var(--text); }
+
+  .team-players { display: flex; flex-direction: column; gap: 4px; max-height: 400px; overflow-y: auto; }
+  .team-players .role-group { margin-top: 4px; }
+  .team-players .role-title {
+    font-size: 11px; font-weight: 700; letter-spacing: .5px;
+    color: var(--muted); margin: 2px 0;
+  }
+  .team-player {
+    display: flex; justify-content: space-between; gap: 6px;
+    padding: 4px 6px; border-radius: 4px; font-size: 13px;
+    background: #f9fafb;
+  }
+  .team-player .p-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .team-player .p-price { color: var(--accent-2); font-weight: 600; flex-shrink: 0; }
+  .team-player .remove-btn {
+    background: transparent; border: 0; color: var(--danger);
+    font-size: 14px; padding: 0 2px; line-height: 1;
+    opacity: .6;
+  }
+  .team-player .remove-btn:hover { opacity: 1; }
+  .team-player-empty { color: #d1d5db; font-size: 12px; font-style: italic; padding: 2px 6px; }
+
+  /* Overview compatta */
+  .teams-overview {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px;
+  }
+  .team-mini {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 10px;
+    cursor: pointer;
+  }
+  .team-mini:hover { border-color: #9ca3af; }
+  .team-mini .team-name { font-size: 13px; margin-bottom: 4px; }
+  .team-mini .mini-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  .team-mini .mini-slots { display: flex; gap: 3px; margin-top: 6px; }
+  .team-mini .mini-slot {
+    flex: 1; text-align: center; padding: 2px;
+    font-size: 10px; font-weight: 700; border-radius: 3px;
+    background: #f3f4f6;
+  }
+
+  /* ---------- Modale ---------- */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    display: flex; align-items: flex-end; justify-content: center;
+    z-index: 100;
+    animation: fadein .12s ease;
+  }
+  @keyframes fadein { from { opacity: 0 } to { opacity: 1 } }
+  @keyframes slideup { from { transform: translateY(20px); opacity: .8 } to { transform: none; opacity: 1 } }
+
+  .modal {
+    background: #fff; width: 100%; max-width: 520px;
+    border-radius: var(--radius) var(--radius) 0 0;
+    box-shadow: var(--shadow-lg);
+    padding: 16px;
+    max-height: 90vh; overflow-y: auto;
+    animation: slideup .16s ease;
+  }
+  @media (min-width: 640px) {
+    .modal-backdrop { align-items: center; }
+    .modal { border-radius: var(--radius); }
+  }
+
+  .modal h2 { margin: 0 0 4px; font-size: 17px; }
+  .modal .player-summary {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 12px;
+  }
+  .modal label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; font-weight: 500; }
+  .modal .price-input {
+    width: 100%; padding: 12px 14px; font-size: 22px; font-weight: 700;
+    border: 2px solid var(--border); border-radius: var(--radius-sm);
+    text-align: center;
+  }
+  .modal .price-input:focus { outline: none; border-color: var(--accent); }
+
+  .team-radio-list { display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow-y: auto; margin-bottom: 12px; }
+  .team-radio {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    cursor: pointer; background: #fff;
+  }
+  .team-radio:hover { border-color: #9ca3af; }
+  .team-radio input { margin: 0; flex-shrink: 0; accent-color: var(--accent); }
+  .team-radio-info { flex: 1; min-width: 0; }
+  .team-radio-name { font-weight: 600; font-size: 14px; }
+  .team-radio-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .team-radio.disabled { opacity: .5; }
+  .team-radio.disabled .team-radio-meta { color: var(--danger); }
+  .team-radio.selected { border-color: var(--accent); background: #ecfdf5; }
+
+  .modal .form-error {
+    background: #fee2e2; color: #991b1b;
+    padding: 8px 10px; border-radius: var(--radius-sm);
+    font-size: 13px; margin-bottom: 10px;
+  }
+
+  .modal-actions { display: flex; gap: 8px; }
+  .modal-actions .btn { flex: 1; justify-content: center; padding: 12px 14px; }
+
+  /* ---------- Impostazioni ---------- */
+  .settings-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px;
+    box-shadow: var(--shadow); margin-bottom: 10px;
+  }
+  .settings-card h3 { margin: 0 0 8px; font-size: 14px; }
+  .settings-card p { font-size: 13px; color: var(--muted); margin: 4px 0 10px; }
+
+  /* ---------- Toast ---------- */
+  .toast-stack {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: 20px; z-index: 200;
+    display: flex; flex-direction: column; gap: 6px;
+    pointer-events: none;
+  }
+  .toast {
+    background: #111827; color: #fff;
+    padding: 10px 14px; border-radius: var(--radius-sm);
+    font-size: 13px; box-shadow: var(--shadow-lg);
+    animation: slideup .12s ease;
+    max-width: 360px;
+  }
+  .toast.success { background: var(--accent-2); }
+  .toast.error { background: var(--danger); }
+
+  /* ---------- Utilità ---------- */
+  .hidden { display: none !important; }
+  .mono { font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 640px) {
+    .topbar h1 { font-size: 14px; }
+    .topbar .icon-btn span { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============================================================
+       Top bar
+       ============================================================ -->
+  <header class="topbar">
+    <h1>⚽ Asta Fantacalcio</h1>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="btn-undo" title="Annulla ultima azione">
+      ↩ <span>Annulla</span>
+    </button>
+  </header>
+
+  <!-- Tabs -->
+  <nav class="tabs" id="tabs">
+    <button data-tab="players" class="active">Giocatori</button>
+    <button data-tab="teams">Squadre</button>
+    <button data-tab="settings">Impostazioni</button>
+  </nav>
+
+  <main>
+
+    <!-- ============================================================
+         Setup iniziale (mostrato se non ancora configurato)
+         ============================================================ -->
+    <section id="view-setup" class="hidden">
+      <div class="setup-card">
+        <h2>1. Numero di squadre</h2>
+        <p>Da 2 a 10 squadre. Ognuna partirà con 500 crediti e 3 P / 8 D / 8 C / 6 A da riempire.</p>
+        <div class="row">
+          <label style="font-size:13px;color:var(--muted);">
+            Quante squadre?
+            <input id="setup-num" type="number" min="2" max="10" value="8" style="width:80px;margin-left:8px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;" />
+          </label>
+        </div>
+      </div>
+
+      <div class="setup-card">
+        <h2>2. Nomi squadre</h2>
+        <p>Puoi anche lasciare i nomi di default e cambiarli più tardi da Impostazioni.</p>
+        <div class="team-inputs" id="setup-teams"></div>
+      </div>
+
+      <div class="setup-card">
+        <h2>3. Lista giocatori</h2>
+        <p>Carica il file <strong>Excel delle quotazioni</strong> di Fantacalcio.it (Quotazioni-Fantacalcio-Stagione-XXXX-XX.xlsx). Uso la colonna <strong>Qt.A</strong> per ordinare.</p>
+        <input type="file" id="setup-file" accept=".xlsx,.xls" />
+        <p id="setup-file-status" style="margin-top:6px;"></p>
+      </div>
+
+      <div class="row" style="margin-top:12px;">
+        <button class="btn accent" id="btn-start" disabled>Inizia asta →</button>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         Tab Giocatori
+         ============================================================ -->
+    <section id="view-players" class="hidden">
+      <input type="search" class="search" id="player-search" placeholder="Cerca giocatore…" />
+      <div class="role-tabs" id="role-tabs">
+        <button data-role="ALL" class="active">Tutti <span class="count" id="count-ALL">0</span></button>
+        <button data-role="P">🧤 Portieri <span class="count" id="count-P">0</span></button>
+        <button data-role="D">🛡️ Difensori <span class="count" id="count-D">0</span></button>
+        <button data-role="C">⚙️ Centrocampisti <span class="count" id="count-C">0</span></button>
+        <button data-role="A">🎯 Attaccanti <span class="count" id="count-A">0</span></button>
+      </div>
+      <div class="player-list" id="player-list"></div>
+    </section>
+
+    <!-- ============================================================
+         Tab Squadre
+         ============================================================ -->
+    <section id="view-teams" class="hidden">
+      <div class="row between" style="margin-bottom:10px;">
+        <div class="view-toggle" id="teams-view-toggle">
+          <button data-view="strip" class="active">Dettaglio</button>
+          <button data-view="overview">Panoramica</button>
+        </div>
+        <span style="font-size:12px;color:var(--muted);" id="teams-hint"></span>
+      </div>
+      <div id="teams-container"></div>
+    </section>
+
+    <!-- ============================================================
+         Tab Impostazioni
+         ============================================================ -->
+    <section id="view-settings" class="hidden">
+      <div class="settings-card">
+        <h3>Nomi squadre</h3>
+        <p>Modifica il nome delle squadre. Le modifiche si salvano automaticamente.</p>
+        <div class="team-inputs" id="settings-teams"></div>
+      </div>
+
+      <div class="settings-card">
+        <h3>Salvataggio</h3>
+        <p>Tutti i dati sono salvati nel browser. Esporta il file JSON di backup se vuoi tenere una copia o passare l'asta su un altro dispositivo.</p>
+        <div class="row">
+          <button class="btn secondary" id="btn-export">Esporta JSON</button>
+          <label class="btn secondary" style="margin:0;">
+            Importa JSON
+            <input type="file" id="import-file" accept=".json" style="display:none;" />
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <h3>Ricarica giocatori</h3>
+        <p>Sostituisci il file delle quotazioni (i giocatori già assegnati restano nelle squadre).</p>
+        <input type="file" id="reload-file" accept=".xlsx,.xls" />
+      </div>
+
+      <div class="settings-card">
+        <h3 style="color:var(--danger);">Zona pericolo</h3>
+        <p>Reset totale: cancella squadre, giocatori assegnati e budget. Non si può annullare.</p>
+        <button class="btn danger" id="btn-reset">Reset totale</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ============================================================
+     Modale asta giocatore
+     ============================================================ -->
+<div class="modal-backdrop hidden" id="auction-modal">
+  <div class="modal">
+    <h2>Assegna giocatore</h2>
+    <div class="player-summary">
+      <div class="role-badge" id="mod-role">?</div>
+      <div style="flex:1;min-width:0;">
+        <div class="player-name" id="mod-name">-</div>
+        <div class="player-meta" id="mod-meta">-</div>
+      </div>
+      <div class="qta-badge">Qt.A <span id="mod-qta">-</span></div>
+    </div>
+
+    <label for="mod-price">Prezzo di aggiudicazione</label>
+    <input type="number" class="price-input mono" id="mod-price" min="1" inputmode="numeric" />
+
+    <label style="margin-top:12px;">Squadra</label>
+    <div class="team-radio-list" id="mod-teams"></div>
+
+    <div class="form-error hidden" id="mod-error"></div>
+
+    <div class="modal-actions">
+      <button class="btn secondary" id="mod-cancel">Annulla</button>
+      <button class="btn accent" id="mod-confirm">Conferma</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-stack" id="toasts"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+/* =============================================================
+   Asta Fantacalcio — logica
+   ============================================================= */
+
+// ---------- Costanti ----------
+const SLOTS = { P: 3, D: 8, C: 8, A: 6 };
+const ROLE_ORDER = ['P', 'D', 'C', 'A'];
+const ROLE_LABEL = { P: 'Portieri', D: 'Difensori', C: 'Centrocampisti', A: 'Attaccanti' };
+const TOTAL_SLOTS = ROLE_ORDER.reduce((s, r) => s + SLOTS[r], 0); // 25
+const INITIAL_BUDGET = 500;
+const STORAGE_KEY = 'asta_fantacalcio_v1';
+const MAX_HISTORY = 50;
+
+// ---------- Stato ----------
+let state = {
+  version: 1,
+  configured: false,
+  teams: [],       // { id, name, players: [{ id, name, role, teamSerieA, qtA, price }] }
+  players: [],     // TUTTI i giocatori dal file, con flag assigned
+  history: [],     // stack di stati precedenti (JSON compressi) per undo
+  activeTab: 'players',
+  activeRole: 'ALL',
+  teamsView: 'strip',
+  search: ''
+};
+
+// ---------- Persistenza ----------
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.error('Errore salvataggio', e);
+    toast('Errore nel salvataggio dei dati', 'error');
+  }
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.version === 1) {
+      state = Object.assign(state, parsed);
+      return true;
+    }
+  } catch (e) {
+    console.error('Errore caricamento', e);
+  }
+  return false;
+}
+
+// ---------- Utility ----------
+function $(sel, root = document) { return root.querySelector(sel); }
+function $$(sel, root = document) { return Array.from(root.querySelectorAll(sel)); }
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') node.className = v;
+    else if (k === 'style') node.style.cssText = v;
+    else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+    else if (v === true) node.setAttribute(k, '');
+    else if (v !== false && v != null) node.setAttribute(k, v);
+  }
+  for (const c of children) {
+    if (c == null || c === false) continue;
+    node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  }
+  return node;
+}
+function toast(msg, kind = '') {
+  const t = el('div', { class: 'toast ' + kind }, msg);
+  $('#toasts').appendChild(t);
+  setTimeout(() => t.remove(), 2600);
+}
+
+// ---------- Logica business ----------
+function makeTeam(id, name) {
+  return { id, name, players: [] };
+}
+function teamBudget(team) {
+  return INITIAL_BUDGET - team.players.reduce((s, p) => s + (p.price || 0), 0);
+}
+function teamRoleCount(team, role) {
+  return team.players.filter(p => p.role === role).length;
+}
+function teamSlotsLeft(team) {
+  return TOTAL_SLOTS - team.players.length;
+}
+function maxBidForTeam(team) {
+  // Dopo l'acquisto restano (slot rimasti - 1) slot che devono avere almeno 1 credito ciascuno
+  const remaining = teamSlotsLeft(team);
+  if (remaining <= 0) return 0;
+  return teamBudget(team) - (remaining - 1);
+}
+function teamCanAcceptRole(team, role) {
+  return teamRoleCount(team, role) < SLOTS[role];
+}
+
+// ---------- History (undo) ----------
+function snapshot() {
+  // Salva lo stato attuale (senza history stessa, per evitare esplosione)
+  const snap = {
+    teams: JSON.parse(JSON.stringify(state.teams)),
+    players: JSON.parse(JSON.stringify(state.players))
+  };
+  state.history.push(snap);
+  if (state.history.length > MAX_HISTORY) state.history.shift();
+}
+function undo() {
+  if (state.history.length === 0) return;
+  const snap = state.history.pop();
+  state.teams = snap.teams;
+  state.players = snap.players;
+  save();
+  renderAll();
+  toast('Ultima azione annullata');
+}
+
+// ---------- Parsing Excel ----------
+async function parseExcelFile(file) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  // Foglio principale: fantacalcio.it usa "Tutti"
+  const sheetName = wb.SheetNames.find(n => /tutti/i.test(n)) || wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+  // Trova la riga di header cercando 'Nome' e 'R'/'Qt.A'
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 5); i++) {
+    const row = rows[i].map(c => String(c || '').trim().toLowerCase());
+    if (row.includes('nome') && (row.includes('r') || row.includes('qt.a'))) {
+      headerIdx = i; break;
+    }
+  }
+  if (headerIdx < 0) throw new Error("Non riesco a trovare l'intestazione delle colonne (Nome, R, Qt.A) nel foglio.");
+
+  const headers = rows[headerIdx].map(c => String(c || '').trim().toLowerCase());
+  const dataRows = rows.slice(headerIdx + 1);
+
+  const iRole = headers.indexOf('r');
+  const iName = headers.indexOf('nome');
+  const iTeam = headers.indexOf('squadra');
+  let iQtA = headers.indexOf('qt.a');
+  if (iQtA < 0) iQtA = 5; // fallback: colonna F
+
+  if (iRole < 0 || iName < 0) throw new Error("Colonne 'R' o 'Nome' non trovate.");
+
+  const players = [];
+  let seq = 0;
+  for (const r of dataRows) {
+    const name = String(r[iName] || '').trim();
+    if (!name) continue;
+    const role = String(r[iRole] || '').trim().toUpperCase();
+    if (!ROLE_ORDER.includes(role)) continue;
+    const teamSerieA = iTeam >= 0 ? String(r[iTeam] || '').trim() : '';
+    const qtA = Number(r[iQtA]) || 0;
+    players.push({
+      id: 'p' + (seq++),
+      name,
+      role,
+      teamSerieA,
+      qtA,
+      assigned: false
+    });
+  }
+  if (players.length === 0) throw new Error('Nessun giocatore valido trovato nel file.');
+  return players;
+}
+
+// ---------- Setup ----------
+function renderSetupTeamInputs() {
+  const num = Math.max(2, Math.min(10, parseInt($('#setup-num').value) || 8));
+  const container = $('#setup-teams');
+  container.innerHTML = '';
+  for (let i = 0; i < num; i++) {
+    const wrap = el('label', {},
+      'Squadra ' + (i + 1),
+      el('input', { type: 'text', 'data-idx': i, value: 'Squadra ' + (i + 1), placeholder: 'Nome squadra' })
+    );
+    container.appendChild(wrap);
+  }
+  updateStartButton();
+}
+
+let pendingPlayers = null; // giocatori caricati in attesa di conferma setup
+function updateStartButton() {
+  const btn = $('#btn-start');
+  btn.disabled = !pendingPlayers;
+}
+
+function initSetupHandlers() {
+  $('#setup-num').addEventListener('input', renderSetupTeamInputs);
+  $('#setup-file').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const status = $('#setup-file-status');
+    status.textContent = 'Analisi in corso…';
+    status.style.color = 'var(--muted)';
+    try {
+      const players = await parseExcelFile(f);
+      pendingPlayers = players;
+      status.textContent = '✓ Caricati ' + players.length + ' giocatori (' +
+        ROLE_ORDER.map(r => r + ':' + players.filter(p => p.role === r).length).join(', ') + ')';
+      status.style.color = 'var(--accent-2)';
+    } catch (err) {
+      pendingPlayers = null;
+      status.textContent = '✗ ' + err.message;
+      status.style.color = 'var(--danger)';
+    }
+    updateStartButton();
+  });
+  $('#btn-start').addEventListener('click', () => {
+    if (!pendingPlayers) return;
+    const inputs = $$('#setup-teams input');
+    const teams = inputs.map((inp, i) => makeTeam('t' + i, inp.value.trim() || ('Squadra ' + (i + 1))));
+    state.teams = teams;
+    state.players = pendingPlayers;
+    state.configured = true;
+    state.history = [];
+    save();
+    pendingPlayers = null;
+    showMainApp();
+    renderAll();
+    toast('Asta pronta. In bocca al lupo!', 'success');
+  });
+}
+
+// ---------- Rendering ----------
+function showMainApp() {
+  $('#view-setup').classList.add('hidden');
+  const tabs = $('#tabs');
+  tabs.style.display = '';
+  setActiveTab(state.activeTab || 'players');
+}
+function showSetup() {
+  $('#view-setup').classList.remove('hidden');
+  $('#view-players').classList.add('hidden');
+  $('#view-teams').classList.add('hidden');
+  $('#view-settings').classList.add('hidden');
+  $('#tabs').style.display = 'none';
+  renderSetupTeamInputs();
+}
+
+function setActiveTab(tab) {
+  state.activeTab = tab;
+  $$('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  $('#view-players').classList.toggle('hidden', tab !== 'players');
+  $('#view-teams').classList.toggle('hidden', tab !== 'teams');
+  $('#view-settings').classList.toggle('hidden', tab !== 'settings');
+  if (tab === 'players') renderPlayers();
+  if (tab === 'teams') renderTeams();
+  if (tab === 'settings') renderSettings();
+  save();
+}
+
+function renderAll() {
+  renderPlayers();
+  renderTeams();
+  renderSettings();
+  $('#btn-undo').disabled = state.history.length === 0;
+}
+
+// -------- Rendering: Giocatori --------
+function renderPlayers() {
+  // Contatori
+  const available = state.players.filter(p => !p.assigned);
+  $('#count-ALL').textContent = available.length;
+  for (const r of ROLE_ORDER) {
+    $('#count-' + r).textContent = available.filter(p => p.role === r).length;
+  }
+
+  const list = $('#player-list');
+  list.innerHTML = '';
+
+  const search = state.search.trim().toLowerCase();
+  let filtered = available;
+  if (state.activeRole !== 'ALL') filtered = filtered.filter(p => p.role === state.activeRole);
+  if (search) filtered = filtered.filter(p =>
+    p.name.toLowerCase().includes(search) ||
+    (p.teamSerieA || '').toLowerCase().includes(search));
+
+  // Ordina per Qt.A desc, poi per nome
+  filtered.sort((a, b) => (b.qtA - a.qtA) || a.name.localeCompare(b.name));
+
+  if (filtered.length === 0) {
+    list.appendChild(el('div', { class: 'empty' },
+      state.activeRole === 'ALL'
+        ? 'Nessun giocatore disponibile'
+        : 'Nessun ' + ROLE_LABEL[state.activeRole].toLowerCase().replace(/i$/, 'e') + ' disponibile'
+    ));
+    return;
+  }
+
+  for (const p of filtered) {
+    const card = el('div', { class: 'player-card', onclick: () => openAuctionModal(p) },
+      el('div', { class: 'role-badge ' + p.role }, p.role),
+      el('div', { class: 'player-info' },
+        el('div', { class: 'player-name' }, p.name),
+        el('div', { class: 'player-meta' }, p.teamSerieA || '—')
+      ),
+      el('div', { class: 'qta-badge mono' }, String(p.qtA))
+    );
+    list.appendChild(card);
+  }
+}
+
+// -------- Rendering: Squadre --------
+function renderTeams() {
+  const container = $('#teams-container');
+  container.innerHTML = '';
+
+  // Aggiorna toggle
+  $$('#teams-view-toggle button').forEach(b => b.classList.toggle('active', b.dataset.view === state.teamsView));
+
+  $('#teams-hint').textContent = state.teamsView === 'strip'
+    ? '← scorri →'
+    : 'clicca per aprire';
+
+  if (state.teams.length === 0) {
+    container.appendChild(el('div', { class: 'empty' }, 'Nessuna squadra configurata.'));
+    return;
+  }
+
+  if (state.teamsView === 'strip') {
+    const strip = el('div', { class: 'teams-strip' });
+    for (const t of state.teams) strip.appendChild(renderTeamCard(t));
+    container.appendChild(strip);
+  } else {
+    const grid = el('div', { class: 'teams-overview' });
+    for (const t of state.teams) grid.appendChild(renderTeamMini(t));
+    container.appendChild(grid);
+  }
+}
+
+function renderTeamCard(team) {
+  const budget = teamBudget(team);
+  const budgetClass = budget < 50 ? 'critical' : budget < 100 ? 'low' : '';
+  const maxBid = maxBidForTeam(team);
+  const slots = teamSlotsLeft(team);
+
+  const slotRow = el('div', { class: 'slot-row' });
+  for (const r of ROLE_ORDER) {
+    const used = teamRoleCount(team, r);
+    const total = SLOTS[r];
+    const chip = el('div', { class: 'slot-chip' + (used === total ? ' full' : '') },
+      el('span', { class: 'role' }, r),
+      el('span', {}, used + '/' + total)
+    );
+    slotRow.appendChild(chip);
+  }
+
+  // Elenco giocatori per ruolo
+  const playersDiv = el('div', { class: 'team-players' });
+  for (const r of ROLE_ORDER) {
+    const inRole = team.players.filter(p => p.role === r).sort((a, b) => b.price - a.price);
+    const group = el('div', { class: 'role-group' });
+    group.appendChild(el('div', { class: 'role-title' }, ROLE_LABEL[r]));
+    if (inRole.length === 0) {
+      group.appendChild(el('div', { class: 'team-player-empty' }, '—'));
+    } else {
+      for (const p of inRole) {
+        const row = el('div', { class: 'team-player' },
+          el('span', { class: 'p-name', title: p.name }, p.name),
+          el('span', { class: 'p-price mono' }, p.price + 'cr'),
+          el('button', { class: 'remove-btn', title: 'Rimuovi (rimette il giocatore in lista)', onclick: (e) => {
+            e.stopPropagation();
+            removePlayerFromTeam(team.id, p.id);
+          } }, '×')
+        );
+        group.appendChild(row);
+      }
+    }
+    playersDiv.appendChild(group);
+  }
+
+  return el('div', { class: 'team-card' },
+    el('div', { class: 'team-header' },
+      el('div', { class: 'team-name', title: team.name }, team.name),
+      el('div', { class: 'budget mono ' + budgetClass }, budget + 'cr')
+    ),
+    slotRow,
+    el('div', { class: 'max-bid' },
+      slots === 0
+        ? 'Rosa completa ✓'
+        : el('span', {}, 'Max prossima puntata: ', el('strong', { class: 'mono' }, maxBid + 'cr'))
+    ),
+    playersDiv
+  );
+}
+
+function renderTeamMini(team) {
+  const budget = teamBudget(team);
+  const slotStr = ROLE_ORDER.map(r => r + ':' + teamRoleCount(team, r) + '/' + SLOTS[r]).join(' · ');
+  return el('div', { class: 'team-mini', onclick: () => { state.teamsView = 'strip'; renderTeams(); scrollTeamIntoView(team.id); } },
+    el('div', { class: 'team-name', title: team.name }, team.name),
+    el('div', { class: 'mini-row' },
+      el('span', {}, budget + 'cr'),
+      el('span', {}, team.players.length + '/' + TOTAL_SLOTS)
+    ),
+    el('div', { class: 'mini-slots' },
+      ...ROLE_ORDER.map(r => {
+        const used = teamRoleCount(team, r);
+        const full = used === SLOTS[r];
+        return el('div', { class: 'mini-slot', style: full ? 'background:#d1fae5;color:var(--accent-2);' : '' },
+          r + used);
+      })
+    )
+  );
+}
+
+function scrollTeamIntoView(teamId) {
+  // Dopo il re-render strip, scrolla la card corrispondente
+  setTimeout(() => {
+    const cards = $$('.team-card');
+    const idx = state.teams.findIndex(t => t.id === teamId);
+    if (cards[idx]) cards[idx].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, 30);
+}
+
+// -------- Rendering: Impostazioni --------
+function renderSettings() {
+  const container = $('#settings-teams');
+  container.innerHTML = '';
+  state.teams.forEach((t, i) => {
+    const inp = el('input', { type: 'text', value: t.name });
+    inp.addEventListener('input', () => {
+      state.teams[i].name = inp.value.trim() || ('Squadra ' + (i + 1));
+      save();
+      renderTeams();
+    });
+    container.appendChild(el('label', {}, 'Squadra ' + (i + 1), inp));
+  });
+}
+
+// ---------- Modale asta ----------
+let currentPlayer = null;
+
+function openAuctionModal(player) {
+  currentPlayer = player;
+  $('#mod-role').textContent = player.role;
+  $('#mod-role').className = 'role-badge ' + player.role;
+  $('#mod-name').textContent = player.name;
+  $('#mod-meta').textContent = ROLE_LABEL[player.role].replace(/i$/, 'e') + ' — ' + (player.teamSerieA || '—');
+  $('#mod-qta').textContent = player.qtA;
+
+  const priceInput = $('#mod-price');
+  priceInput.value = Math.max(1, player.qtA || 1);
+
+  renderTeamRadios(player, parseInt(priceInput.value) || 1);
+  $('#mod-error').classList.add('hidden');
+  $('#auction-modal').classList.remove('hidden');
+
+  // Focus + select prezzo per digitare subito il valore reale
+  setTimeout(() => { priceInput.focus(); priceInput.select(); }, 40);
+}
+
+function closeAuctionModal() {
+  $('#auction-modal').classList.add('hidden');
+  currentPlayer = null;
+}
+
+function renderTeamRadios(player, price) {
+  const list = $('#mod-teams');
+  list.innerHTML = '';
+  const selected = list.dataset.selected;
+  for (const t of state.teams) {
+    const roleOk = teamCanAcceptRole(t, player.role);
+    const maxBid = maxBidForTeam(t);
+    const priceOk = price >= 1 && price <= maxBid;
+    const enabled = roleOk && priceOk;
+
+    let meta = teamBudget(t) + 'cr · ' + teamRoleCount(t, player.role) + '/' + SLOTS[player.role] + ' ' + player.role + ' · max ' + maxBid + 'cr';
+    if (!roleOk) meta = 'Slot ' + player.role + ' esauriti';
+    else if (!priceOk) meta = 'Budget max: ' + maxBid + 'cr';
+
+    const isSelected = selected === t.id && enabled;
+    const label = el('label', { class: 'team-radio' + (enabled ? '' : ' disabled') + (isSelected ? ' selected' : '') },
+      el('input', { type: 'radio', name: 'team-pick', value: t.id, disabled: !enabled, checked: isSelected }),
+      el('div', { class: 'team-radio-info' },
+        el('div', { class: 'team-radio-name' }, t.name),
+        el('div', { class: 'team-radio-meta' }, meta)
+      )
+    );
+    label.querySelector('input').addEventListener('change', () => {
+      list.dataset.selected = t.id;
+      $$('.team-radio', list).forEach(r => r.classList.remove('selected'));
+      label.classList.add('selected');
+    });
+    list.appendChild(label);
+  }
+}
+
+function assignPlayer(player, teamId, price) {
+  const team = state.teams.find(t => t.id === teamId);
+  if (!team) throw new Error('Squadra non trovata');
+  if (!teamCanAcceptRole(team, player.role)) throw new Error('Slot ' + player.role + ' esauriti per ' + team.name);
+  const max = maxBidForTeam(team);
+  if (price < 1) throw new Error('Il prezzo minimo è 1 credito');
+  if (price > max) throw new Error('Prezzo troppo alto per ' + team.name + ' (max ' + max + 'cr)');
+
+  snapshot();
+  team.players.push({
+    id: player.id,
+    name: player.name,
+    role: player.role,
+    teamSerieA: player.teamSerieA,
+    qtA: player.qtA,
+    price
+  });
+  const pl = state.players.find(x => x.id === player.id);
+  if (pl) pl.assigned = true;
+  save();
+  renderAll();
+  toast(player.name + ' → ' + team.name + ' per ' + price + 'cr', 'success');
+}
+
+function removePlayerFromTeam(teamId, playerId) {
+  const team = state.teams.find(t => t.id === teamId);
+  if (!team) return;
+  const idx = team.players.findIndex(p => p.id === playerId);
+  if (idx < 0) return;
+  const p = team.players[idx];
+  if (!confirm('Rimuovere ' + p.name + ' da ' + team.name + '? Torna disponibile in lista.')) return;
+  snapshot();
+  team.players.splice(idx, 1);
+  const pl = state.players.find(x => x.id === playerId);
+  if (pl) pl.assigned = false;
+  save();
+  renderAll();
+  toast(p.name + ' rimosso da ' + team.name);
+}
+
+function initAuctionModalHandlers() {
+  $('#mod-cancel').addEventListener('click', closeAuctionModal);
+  $('#auction-modal').addEventListener('click', e => {
+    if (e.target.id === 'auction-modal') closeAuctionModal();
+  });
+  $('#mod-price').addEventListener('input', () => {
+    if (!currentPlayer) return;
+    const price = parseInt($('#mod-price').value) || 0;
+    renderTeamRadios(currentPlayer, price);
+  });
+  $('#mod-price').addEventListener('keydown', e => {
+    if (e.key === 'Enter') $('#mod-confirm').click();
+  });
+  $('#mod-confirm').addEventListener('click', () => {
+    if (!currentPlayer) return;
+    const err = $('#mod-error');
+    err.classList.add('hidden');
+    const price = parseInt($('#mod-price').value);
+    if (!Number.isFinite(price) || price < 1) {
+      err.textContent = 'Inserisci un prezzo intero ≥ 1';
+      err.classList.remove('hidden');
+      return;
+    }
+    const teamId = $('#mod-teams').dataset.selected ||
+      ($('#mod-teams input[type=radio]:checked') || {}).value;
+    if (!teamId) {
+      err.textContent = 'Seleziona una squadra';
+      err.classList.remove('hidden');
+      return;
+    }
+    try {
+      assignPlayer(currentPlayer, teamId, price);
+      closeAuctionModal();
+    } catch (e) {
+      err.textContent = e.message;
+      err.classList.remove('hidden');
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !$('#auction-modal').classList.contains('hidden')) closeAuctionModal();
+  });
+}
+
+// ---------- Handlers globali ----------
+function initTabs() {
+  $$('#tabs button').forEach(b => {
+    b.addEventListener('click', () => setActiveTab(b.dataset.tab));
+  });
+  $$('#role-tabs button').forEach(b => {
+    b.addEventListener('click', () => {
+      state.activeRole = b.dataset.role;
+      $$('#role-tabs button').forEach(x => x.classList.toggle('active', x === b));
+      renderPlayers();
+      save();
+    });
+  });
+  $('#player-search').addEventListener('input', e => {
+    state.search = e.target.value;
+    renderPlayers();
+  });
+  $$('#teams-view-toggle button').forEach(b => {
+    b.addEventListener('click', () => {
+      state.teamsView = b.dataset.view;
+      renderTeams();
+      save();
+    });
+  });
+  $('#btn-undo').addEventListener('click', undo);
+}
+
+function initSettingsHandlers() {
+  $('#btn-export').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = el('a', { href: url, download: 'asta-fantacalcio-' + new Date().toISOString().slice(0,10) + '.json' });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast('Backup esportato', 'success');
+  });
+  $('#import-file').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      const text = await f.text();
+      const parsed = JSON.parse(text);
+      if (!parsed.version || !parsed.teams || !parsed.players) throw new Error('File non valido');
+      if (!confirm('Importare questo backup? Sostituirà lo stato attuale.')) return;
+      state = Object.assign({}, state, parsed);
+      save();
+      showMainApp();
+      renderAll();
+      toast('Backup importato', 'success');
+    } catch (err) {
+      toast('Errore import: ' + err.message, 'error');
+    }
+    e.target.value = '';
+  });
+  $('#reload-file').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      const newPlayers = await parseExcelFile(f);
+      // Mantieni assegnati: se un nome+ruolo esiste già nelle squadre, marca assigned
+      const assignedKey = new Set();
+      state.teams.forEach(t => t.players.forEach(p => assignedKey.add(p.role + '|' + p.name.toLowerCase())));
+      newPlayers.forEach(p => {
+        if (assignedKey.has(p.role + '|' + p.name.toLowerCase())) p.assigned = true;
+      });
+      snapshot();
+      state.players = newPlayers;
+      save();
+      renderAll();
+      toast('Lista giocatori aggiornata (' + newPlayers.length + ')', 'success');
+    } catch (err) {
+      toast('Errore: ' + err.message, 'error');
+    }
+    e.target.value = '';
+  });
+  $('#btn-reset').addEventListener('click', () => {
+    if (!confirm('Cancellare TUTTO (squadre, giocatori, asta) e ricominciare?')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    state = {
+      version: 1, configured: false, teams: [], players: [],
+      history: [], activeTab: 'players', activeRole: 'ALL',
+      teamsView: 'strip', search: ''
+    };
+    showSetup();
+  });
+}
+
+// ---------- Bootstrap ----------
+function boot() {
+  initSetupHandlers();
+  initAuctionModalHandlers();
+  initTabs();
+  initSettingsHandlers();
+  if (load() && state.configured) {
+    showMainApp();
+    renderAll();
+  } else {
+    showSetup();
+  }
+}
+document.addEventListener('DOMContentLoaded', boot);
+</script>
+</body>
+</html>

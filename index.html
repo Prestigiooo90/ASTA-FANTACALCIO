@@ -277,17 +277,8 @@
   .team-player-empty { color: #d1d5db; font-size: 12px; font-style: italic; padding: 2px 6px; }
 
   /* Overview compatta */
-  .overview-controls {
-    display: flex; justify-content: space-between; align-items: center;
-    gap: 8px; margin-bottom: 8px; flex-wrap: wrap;
-  }
-  .overview-controls label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
-  .overview-controls select {
-    padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm);
-    background: #fff; font-size: 13px;
-  }
   .teams-overview {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px;
   }
   .team-mini {
     background: var(--card); border: 1px solid var(--border);
@@ -303,20 +294,6 @@
     font-size: 10px; font-weight: 700; border-radius: 3px;
     background: #f3f4f6;
   }
-  .team-mini .mini-players {
-    margin-top: 6px; padding-top: 6px;
-    border-top: 1px solid var(--border);
-    display: flex; flex-direction: column; gap: 3px;
-    max-height: 260px; overflow-y: auto;
-  }
-  .team-mini .mini-player {
-    display: flex; justify-content: space-between; gap: 4px;
-    font-size: 12px; padding: 3px 5px; background: #f9fafb;
-    border-radius: 3px;
-  }
-  .team-mini .mini-player .mp-price { color: var(--accent-2); font-weight: 600; font-variant-numeric: tabular-nums; }
-  .team-mini .mini-empty { font-size: 11px; color: #9ca3af; font-style: italic; padding: 2px 4px; }
-
   /* Bottone "+" aggiungi giocatore alla team-card */
   .btn-add {
     background: var(--accent); color: #fff; border: 0;
@@ -747,7 +724,6 @@ let state = {
   activeTab: 'players',
   activeRole: 'ALL',
   teamsView: 'strip',
-  overviewRole: 'ALL',   // filtro ruolo per la vista Panoramica
   search: ''
 };
 
@@ -1221,26 +1197,6 @@ function renderTeams() {
     for (const t of ca().teams) strip.appendChild(renderTeamCard(t));
     container.appendChild(strip);
   } else {
-    // Vista Panoramica: selettore ruolo + griglia mini card
-    const controls = el('div', { class: 'overview-controls' });
-    const sel = el('select', {
-      onchange: (e) => { state.overviewRole = e.target.value; save(); renderTeams(); }
-    });
-    const options = [
-      ['ALL', 'Tutti (riepilogo)'],
-      ['P', 'Portieri'],
-      ['D', 'Difensori'],
-      ['C', 'Centrocampisti'],
-      ['A', 'Attaccanti']
-    ];
-    for (const [v, lbl] of options) {
-      const opt = el('option', { value: v }, lbl);
-      if (state.overviewRole === v) opt.selected = true;
-      sel.appendChild(opt);
-    }
-    controls.appendChild(el('label', {}, 'Mostra: ', sel));
-    container.appendChild(controls);
-
     const grid = el('div', { class: 'teams-overview' });
     for (const t of ca().teams) grid.appendChild(renderTeamMini(t));
     container.appendChild(grid);
@@ -1314,9 +1270,7 @@ function renderTeamCard(team) {
 }
 function renderTeamMini(team) {
   const budget = teamBudget(team);
-  const role = state.overviewRole;
-
-  const card = el('div', { class: 'team-mini', onclick: () => { state.teamsView = 'strip'; renderTeams(); scrollTeamIntoView(team.id); } },
+  return el('div', { class: 'team-mini', onclick: () => { state.teamsView = 'strip'; renderTeams(); scrollTeamIntoView(team.id); } },
     el('div', { class: 'team-name', title: team.name }, team.name),
     el('div', { class: 'mini-row' },
       el('span', {}, budget + 'cr'),
@@ -1331,24 +1285,6 @@ function renderTeamMini(team) {
       })
     )
   );
-
-  if (role !== 'ALL') {
-    // Mostra i giocatori del ruolo selezionato per questa squadra
-    const players = team.players.filter(p => p.role === role).sort((a, b) => b.price - a.price);
-    const playersDiv = el('div', { class: 'mini-players' });
-    if (players.length === 0) {
-      playersDiv.appendChild(el('div', { class: 'mini-empty' }, 'nessuno'));
-    } else {
-      for (const p of players) {
-        playersDiv.appendChild(el('div', { class: 'mini-player' },
-          el('span', { title: p.name, style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' }, p.name),
-          el('span', { class: 'mp-price' }, p.price + 'cr')
-        ));
-      }
-    }
-    card.appendChild(playersDiv);
-  }
-  return card;
 }
 function scrollTeamIntoView(teamId) {
   setTimeout(() => {

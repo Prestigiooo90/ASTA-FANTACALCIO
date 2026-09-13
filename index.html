@@ -277,8 +277,17 @@
   .team-player-empty { color: #d1d5db; font-size: 12px; font-style: italic; padding: 2px 6px; }
 
   /* Overview compatta */
+  .overview-controls {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 8px; margin-bottom: 8px; flex-wrap: wrap;
+  }
+  .overview-controls label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .overview-controls select {
+    padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: #fff; font-size: 13px;
+  }
   .teams-overview {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;
   }
   .team-mini {
     background: var(--card); border: 1px solid var(--border);
@@ -294,6 +303,31 @@
     font-size: 10px; font-weight: 700; border-radius: 3px;
     background: #f3f4f6;
   }
+  .team-mini .mini-players {
+    margin-top: 6px; padding-top: 6px;
+    border-top: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 3px;
+    max-height: 260px; overflow-y: auto;
+  }
+  .team-mini .mini-player {
+    display: flex; justify-content: space-between; gap: 4px;
+    font-size: 12px; padding: 3px 5px; background: #f9fafb;
+    border-radius: 3px;
+  }
+  .team-mini .mini-player .mp-price { color: var(--accent-2); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .team-mini .mini-empty { font-size: 11px; color: #9ca3af; font-style: italic; padding: 2px 4px; }
+
+  /* Bottone "+" aggiungi giocatore alla team-card */
+  .btn-add {
+    background: var(--accent); color: #fff; border: 0;
+    width: 26px; height: 26px; border-radius: 50%;
+    font-size: 18px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; padding: 0; flex-shrink: 0;
+  }
+  .btn-add:hover { background: var(--accent-2); }
+  .btn-add:disabled { opacity: .4; cursor: not-allowed; }
+  .team-header-right { display: flex; gap: 6px; align-items: center; }
 
   /* ---------- Modale ---------- */
   .modal-backdrop {
@@ -609,6 +643,24 @@
 </div>
 
 <!-- ============================================================
+     Modale scegli giocatore (da vista dettaglio squadra)
+     ============================================================ -->
+<div class="modal-backdrop hidden" id="pick-player-modal">
+  <div class="modal">
+    <h2>Aggiungi giocatore</h2>
+    <p style="margin:4px 0 8px;font-size:13px;color:var(--muted);">
+      a <strong id="pp-team-name">-</strong>
+    </p>
+    <div class="role-tabs" id="pp-role-tabs"></div>
+    <input type="search" class="search" id="pp-search" placeholder="Cerca giocatore…" />
+    <div class="player-list" id="pp-list" style="max-height:50vh;overflow-y:auto;"></div>
+    <div class="modal-actions" style="margin-top:10px;">
+      <button class="btn secondary" id="pp-cancel">Annulla</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
      Modale nuova asta
      ============================================================ -->
 <div class="modal-backdrop hidden" id="new-auction-modal">
@@ -695,6 +747,7 @@ let state = {
   activeTab: 'players',
   activeRole: 'ALL',
   teamsView: 'strip',
+  overviewRole: 'ALL',   // filtro ruolo per la vista Panoramica
   search: ''
 };
 
@@ -1168,6 +1221,26 @@ function renderTeams() {
     for (const t of ca().teams) strip.appendChild(renderTeamCard(t));
     container.appendChild(strip);
   } else {
+    // Vista Panoramica: selettore ruolo + griglia mini card
+    const controls = el('div', { class: 'overview-controls' });
+    const sel = el('select', {
+      onchange: (e) => { state.overviewRole = e.target.value; save(); renderTeams(); }
+    });
+    const options = [
+      ['ALL', 'Tutti (riepilogo)'],
+      ['P', 'Portieri'],
+      ['D', 'Difensori'],
+      ['C', 'Centrocampisti'],
+      ['A', 'Attaccanti']
+    ];
+    for (const [v, lbl] of options) {
+      const opt = el('option', { value: v }, lbl);
+      if (state.overviewRole === v) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    controls.appendChild(el('label', {}, 'Mostra: ', sel));
+    container.appendChild(controls);
+
     const grid = el('div', { class: 'teams-overview' });
     for (const t of ca().teams) grid.appendChild(renderTeamMini(t));
     container.appendChild(grid);
@@ -1214,10 +1287,21 @@ function renderTeamCard(team) {
     playersDiv.appendChild(group);
   }
 
+  const canAddMore = team.players.length < TOTAL_SLOTS;
+  const addBtn = el('button', {
+    class: 'btn-add',
+    title: canAddMore ? 'Aggiungi un giocatore a ' + team.name : 'Rosa completa',
+    disabled: !canAddMore,
+    onclick: (e) => { e.stopPropagation(); openPickPlayerModal(team.id); }
+  }, '+');
+
   return el('div', { class: 'team-card' },
     el('div', { class: 'team-header' },
       el('div', { class: 'team-name', title: team.name }, team.name),
-      el('div', { class: 'budget mono ' + budgetClass }, budget + 'cr')
+      el('div', { class: 'team-header-right' },
+        el('div', { class: 'budget mono ' + budgetClass }, budget + 'cr'),
+        addBtn
+      )
     ),
     slotRow,
     el('div', { class: 'max-bid' },
@@ -1230,7 +1314,9 @@ function renderTeamCard(team) {
 }
 function renderTeamMini(team) {
   const budget = teamBudget(team);
-  return el('div', { class: 'team-mini', onclick: () => { state.teamsView = 'strip'; renderTeams(); scrollTeamIntoView(team.id); } },
+  const role = state.overviewRole;
+
+  const card = el('div', { class: 'team-mini', onclick: () => { state.teamsView = 'strip'; renderTeams(); scrollTeamIntoView(team.id); } },
     el('div', { class: 'team-name', title: team.name }, team.name),
     el('div', { class: 'mini-row' },
       el('span', {}, budget + 'cr'),
@@ -1245,6 +1331,24 @@ function renderTeamMini(team) {
       })
     )
   );
+
+  if (role !== 'ALL') {
+    // Mostra i giocatori del ruolo selezionato per questa squadra
+    const players = team.players.filter(p => p.role === role).sort((a, b) => b.price - a.price);
+    const playersDiv = el('div', { class: 'mini-players' });
+    if (players.length === 0) {
+      playersDiv.appendChild(el('div', { class: 'mini-empty' }, 'nessuno'));
+    } else {
+      for (const p of players) {
+        playersDiv.appendChild(el('div', { class: 'mini-player' },
+          el('span', { title: p.name, style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' }, p.name),
+          el('span', { class: 'mp-price' }, p.price + 'cr')
+        ));
+      }
+    }
+    card.appendChild(playersDiv);
+  }
+  return card;
 }
 function scrollTeamIntoView(teamId) {
   setTimeout(() => {
@@ -1333,7 +1437,7 @@ function onDeleteAuction(id) {
 
 // ---------- Modale asta giocatore ----------
 let currentPlayer = null;
-function openAuctionModal(player) {
+function openAuctionModal(player, presetTeamId) {
   currentPlayer = player;
   $('#mod-role').textContent = player.role;
   $('#mod-role').className = 'role-badge ' + player.role;
@@ -1341,8 +1445,8 @@ function openAuctionModal(player) {
   $('#mod-meta').textContent = ROLE_LABEL[player.role].replace(/i$/, 'e') + ' — ' + (player.teamSerieA || '—');
   $('#mod-qta').textContent = player.qtA;
   const priceInput = $('#mod-price');
-  priceInput.value = Math.max(1, player.qtA || 1);
-  $('#mod-teams').dataset.selected = '';
+  priceInput.value = 1; // rilancio base: parte sempre da 1, poi digiti il valore finale
+  $('#mod-teams').dataset.selected = presetTeamId || '';
   renderTeamRadios(player, parseInt(priceInput.value) || 1);
   $('#mod-error').classList.add('hidden');
   $('#auction-modal').classList.remove('hidden');
@@ -1462,7 +1566,96 @@ function initAuctionModalHandlers() {
     if (e.key === 'Escape') {
       if (!$('#auction-modal').classList.contains('hidden')) closeAuctionModal();
       if (!$('#new-auction-modal').classList.contains('hidden')) closeNewAuctionModal();
+      if (!$('#pick-player-modal').classList.contains('hidden')) closePickPlayerModal();
     }
+  });
+}
+
+// ---------- Modale pick-player (aggiungi giocatore da vista squadra) ----------
+let pickPlayerTeamId = null;
+let pickPlayerRole = 'ALL';
+let pickPlayerSearch = '';
+
+function openPickPlayerModal(teamId) {
+  const team = ca().teams.find(t => t.id === teamId);
+  if (!team) return;
+  if (team.players.length >= TOTAL_SLOTS) { toast('Rosa completa', 'error'); return; }
+  pickPlayerTeamId = teamId;
+  pickPlayerRole = 'ALL';
+  pickPlayerSearch = '';
+  $('#pp-team-name').textContent = team.name;
+  $('#pp-search').value = '';
+  renderPickPlayerRoleTabs();
+  renderPickPlayerList();
+  $('#pick-player-modal').classList.remove('hidden');
+  setTimeout(() => $('#pp-search').focus(), 40);
+}
+function closePickPlayerModal() {
+  $('#pick-player-modal').classList.add('hidden');
+  pickPlayerTeamId = null;
+}
+function renderPickPlayerRoleTabs() {
+  const team = ca().teams.find(t => t.id === pickPlayerTeamId);
+  if (!team) return;
+  const container = $('#pp-role-tabs');
+  container.innerHTML = '';
+  const availableRoles = ROLE_ORDER.filter(r => teamCanAcceptRole(team, r));
+
+  // Se il ruolo selezionato non è più disponibile, torna a ALL
+  if (pickPlayerRole !== 'ALL' && !availableRoles.includes(pickPlayerRole)) pickPlayerRole = 'ALL';
+
+  const items = [['ALL', 'Tutti'], ...availableRoles.map(r => [r, r])];
+  for (const [val, label] of items) {
+    const available = ca().players.filter(p => !p.assigned && (val === 'ALL' ? availableRoles.includes(p.role) : p.role === val));
+    const btn = el('button', {
+      class: pickPlayerRole === val ? 'active' : '',
+      onclick: () => { pickPlayerRole = val; renderPickPlayerRoleTabs(); renderPickPlayerList(); }
+    }, label, el('span', { class: 'count' }, String(available.length)));
+    container.appendChild(btn);
+  }
+}
+function renderPickPlayerList() {
+  const container = $('#pp-list');
+  container.innerHTML = '';
+  const team = ca().teams.find(t => t.id === pickPlayerTeamId);
+  if (!team) return;
+
+  const availableRoles = ROLE_ORDER.filter(r => teamCanAcceptRole(team, r));
+  let players = ca().players.filter(p => !p.assigned && availableRoles.includes(p.role));
+  if (pickPlayerRole !== 'ALL') players = players.filter(p => p.role === pickPlayerRole);
+  const search = pickPlayerSearch.trim().toLowerCase();
+  if (search) players = players.filter(p =>
+    p.name.toLowerCase().includes(search) || (p.teamSerieA || '').toLowerCase().includes(search));
+  players.sort((a, b) => (b.qtA - a.qtA) || a.name.localeCompare(b.name));
+
+  if (players.length === 0) {
+    container.appendChild(el('div', { class: 'empty' }, 'Nessun giocatore disponibile'));
+    return;
+  }
+  for (const p of players) {
+    const card = el('div', { class: 'player-card', onclick: () => {
+      const teamId = pickPlayerTeamId;
+      closePickPlayerModal();
+      openAuctionModal(p, teamId);
+    } },
+      el('div', { class: 'role-badge ' + p.role }, p.role),
+      el('div', { class: 'player-info' },
+        el('div', { class: 'player-name' }, p.name),
+        el('div', { class: 'player-meta' }, p.teamSerieA || '—')
+      ),
+      el('div', { class: 'qta-badge mono' }, String(p.qtA))
+    );
+    container.appendChild(card);
+  }
+}
+function initPickPlayerHandlers() {
+  $('#pp-cancel').addEventListener('click', closePickPlayerModal);
+  $('#pick-player-modal').addEventListener('click', e => {
+    if (e.target.id === 'pick-player-modal') closePickPlayerModal();
+  });
+  $('#pp-search').addEventListener('input', e => {
+    pickPlayerSearch = e.target.value;
+    renderPickPlayerList();
   });
 }
 
@@ -1736,6 +1929,7 @@ function boot() {
   initSetupHandlers();
   initAuctionModalHandlers();
   initNewAuctionModalHandlers();
+  initPickPlayerHandlers();
   initTabs();
   initSettingsHandlers();
   const ok = load();

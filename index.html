@@ -188,6 +188,10 @@
   }
   .player-card:hover { border-color: #9ca3af; }
   .player-card:active { transform: scale(.99); }
+  /* Colore card in base alla titolarità (stagione in corso) */
+  .player-card.tit-hi  { box-shadow: inset 5px 0 0 0 #10b981; background: #f0fdf4; }
+  .player-card.tit-mid { box-shadow: inset 5px 0 0 0 #f59e0b; background: #fffbeb; }
+  .player-card.tit-lo  { box-shadow: inset 5px 0 0 0 #ef4444; background: #fef2f2; }
   .role-badge {
     width: 30px; height: 30px; border-radius: 6px;
     display: inline-flex; align-items: center; justify-content: center;
@@ -200,6 +204,59 @@
   .player-info { flex: 1; min-width: 0; }
   .player-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .player-meta { font-size: 12px; color: var(--muted); }
+
+  /* Badge statistiche nella lista giocatori */
+  .player-stats { display: flex; flex-wrap: wrap; gap: 4px 5px; margin-top: 5px; }
+  .stat-chip {
+    font-size: 11px; font-weight: 700; line-height: 1;
+    padding: 3px 6px; border-radius: 6px; white-space: nowrap;
+    background: #f3f4f6; color: #374151;
+    display: inline-flex; align-items: center; gap: 3px;
+  }
+  .stat-chip .lbl { font-weight: 500; opacity: .75; }
+  .stat-chip.fm  { background: #ecfdf5; color: #047857; }
+  .stat-chip.gol { background: #eef2ff; color: #4338ca; }
+  .stat-chip.tit-hi  { background: #d1fae5; color: #065f46; }
+  .stat-chip.tit-mid { background: #fef3c7; color: #92400e; }
+  .stat-chip.tit-lo  { background: #fee2e2; color: #991b1b; }
+
+  /* Toolbar ordinamento */
+  .players-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .players-toolbar .search { flex: 1; margin: 0; }
+  .sort-select {
+    padding: 9px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: #fff; font-size: 13px; color: var(--text); max-width: 46%;
+  }
+
+  /* Tabella statistiche nel modale */
+  .mod-stats { margin: 10px 0 2px; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+  .mod-stats table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .mod-stats th, .mod-stats td { padding: 6px 8px; text-align: center; }
+  .mod-stats thead th { background: #f9fafb; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; }
+  .mod-stats tbody th { text-align: left; font-weight: 600; background: #fff; }
+  .mod-stats tbody tr:not(:last-child) th,
+  .mod-stats tbody tr:not(:last-child) td { border-bottom: 1px solid var(--border); }
+  .mod-stats td.muted { color: var(--muted); }
+  .mod-stats-empty { font-size: 12px; color: var(--muted); margin: 10px 0 2px; }
+
+  /* Suggerimenti "completa la rosa" */
+  .btn-suggest {
+    border: none; background: #eef2ff; color: #4338ca; cursor: pointer;
+    width: 28px; height: 28px; border-radius: 6px; font-size: 14px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .btn-suggest:hover { background: #e0e7ff; }
+  .suggest-role-block { margin-bottom: 14px; }
+  .suggest-role-block h4 { margin: 0 0 6px; font-size: 13px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .suggest-role-block h4 .need { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .suggest-item {
+    display: flex; align-items: center; gap: 8px; padding: 7px 8px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 4px; cursor: pointer;
+  }
+  .suggest-item:hover { border-color: #9ca3af; }
+  .suggest-item .s-name { flex: 1; min-width: 0; font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .suggest-item .s-stats { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .suggest-item .s-qta { font-weight: 700; font-size: 13px; }
   .qta-badge {
     background: #f3f4f6; color: var(--text);
     padding: 4px 10px; border-radius: 999px; font-weight: 600; font-size: 13px;
@@ -518,7 +575,16 @@
          Tab Giocatori
          ============================================================ -->
     <section id="view-players" class="hidden">
-      <input type="search" class="search" id="player-search" placeholder="Cerca giocatore…" />
+      <div class="players-toolbar">
+        <input type="search" class="search" id="player-search" placeholder="Cerca giocatore…" />
+        <select class="sort-select" id="player-sort" title="Ordina la lista">
+          <option value="qta">Ordina: Qt.A</option>
+          <option value="fm">Ordina: Fantamedia</option>
+          <option value="gf">Ordina: Gol (in corso)</option>
+          <option value="gfprev">Ordina: Gol (anno scorso)</option>
+          <option value="tit">Ordina: Titolarità</option>
+        </select>
+      </div>
       <div class="role-tabs" id="role-tabs">
         <button data-role="ALL" class="active">Tutti <span class="count" id="count-ALL">0</span></button>
         <button data-role="P">🧤 Portieri <span class="count" id="count-P">0</span></button>
@@ -580,6 +646,14 @@
       </div>
 
       <div class="settings-card">
+        <h3>Statistiche giocatori (opzionale)</h3>
+        <p>Carica i file <strong>Statistiche</strong> di Fantacalcio.it (stagione in corso e/o precedente). Aggiungo fantamedia, gol, assist e % titolarità a ogni giocatore, con ordinamento e consigli. Puoi selezionare entrambi i file insieme.</p>
+        <input type="file" id="stats-file" accept=".xlsx,.xls" multiple />
+        <p id="stats-status" style="margin-top:8px;font-size:12px;"></p>
+        <button class="btn secondary" id="btn-clear-stats" style="margin-top:6px;display:none;">Rimuovi statistiche</button>
+      </div>
+
+      <div class="settings-card">
         <h3 style="color:var(--danger);">Zona pericolo</h3>
         <p>Reset totale: cancella <strong>tutte</strong> le aste, tutti i dati. Non si può annullare.</p>
         <button class="btn danger" id="btn-reset">Reset totale</button>
@@ -603,6 +677,8 @@
       </div>
       <div class="qta-badge">Qt.A <span id="mod-qta">-</span></div>
     </div>
+
+    <div id="mod-stats"></div>
 
     <label for="mod-price">Prezzo di aggiudicazione</label>
     <input type="number" class="price-input mono" id="mod-price" min="1" inputmode="numeric" />
@@ -691,6 +767,22 @@
   </div>
 </div>
 
+<!-- ============================================================
+     Modale suggerimenti "completa la rosa"
+     ============================================================ -->
+<div class="modal-backdrop hidden" id="suggest-modal">
+  <div class="modal">
+    <h2>💡 Completa la rosa</h2>
+    <p style="margin:4px 0 10px;font-size:13px;color:var(--muted);">
+      <strong id="sg-team-name">-</strong><br><span id="sg-budget">-</span>
+    </p>
+    <div id="sg-body" style="max-height:60vh;overflow-y:auto;"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="sg-close">Chiudi</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-stack" id="toasts"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -724,7 +816,10 @@ let state = {
   activeTab: 'players',
   activeRole: 'ALL',
   teamsView: 'strip',
-  search: ''
+  search: '',
+  sortBy: 'qta',
+  // Statistiche giocatori (dati di riferimento, condivisi fra tutte le aste)
+  stats: { cur: null, prev: null }
 };
 
 // ---------- Persistenza + migrazione ----------
@@ -1155,7 +1250,9 @@ function renderPlayers() {
     p.name.toLowerCase().includes(search) ||
     (p.teamSerieA || '').toLowerCase().includes(search));
 
-  filtered.sort((a, b) => (b.qtA - a.qtA) || a.name.localeCompare(b.name));
+  const sortSel = $('#player-sort');
+  if (sortSel) sortSel.value = state.sortBy || 'qta';
+  sortPlayers(filtered);
 
   if (filtered.length === 0) {
     list.appendChild(el('div', { class: 'empty' },
@@ -1167,12 +1264,9 @@ function renderPlayers() {
   }
 
   for (const p of filtered) {
-    const card = el('div', { class: 'player-card', onclick: () => openAuctionModal(p) },
+    const card = el('div', { class: 'player-card' + titCardClass(p), onclick: () => openAuctionModal(p) },
       el('div', { class: 'role-badge ' + p.role }, p.role),
-      el('div', { class: 'player-info' },
-        el('div', { class: 'player-name' }, p.name),
-        el('div', { class: 'player-meta' }, p.teamSerieA || '—')
-      ),
+      playerInfoEl(p),
       el('div', { class: 'qta-badge mono' }, String(p.qtA))
     );
     list.appendChild(card);
@@ -1256,6 +1350,7 @@ function renderTeamCard(team) {
       el('div', { class: 'team-name', title: team.name }, team.name),
       el('div', { class: 'team-header-right' },
         el('div', { class: 'budget mono ' + budgetClass }, budget + 'cr'),
+        el('button', { class: 'btn-suggest', title: 'Consigli per completare la rosa', onclick: (e) => { e.stopPropagation(); openSuggestModal(team.id); } }, '💡'),
         addBtn
       )
     ),
@@ -1298,6 +1393,7 @@ function scrollTeamIntoView(teamId) {
 function renderSettings() {
   renderAuctionList();
   renderSettingsTeams();
+  renderStatsStatus();
 }
 function renderAuctionList() {
   const container = $('#auction-list');
@@ -1380,6 +1476,7 @@ function openAuctionModal(player, presetTeamId) {
   $('#mod-name').textContent = player.name;
   $('#mod-meta').textContent = ROLE_LABEL[player.role].replace(/i$/, 'e') + ' — ' + (player.teamSerieA || '—');
   $('#mod-qta').textContent = player.qtA;
+  renderModalStats(player);
   const priceInput = $('#mod-price');
   priceInput.value = 1; // rilancio base: parte sempre da 1, poi digiti il valore finale
   $('#mod-teams').dataset.selected = presetTeamId || '';
@@ -1569,16 +1666,13 @@ function renderPickPlayerList() {
     return;
   }
   for (const p of players) {
-    const card = el('div', { class: 'player-card', onclick: () => {
+    const card = el('div', { class: 'player-card' + titCardClass(p), onclick: () => {
       const teamId = pickPlayerTeamId;
       closePickPlayerModal();
       openAuctionModal(p, teamId);
     } },
       el('div', { class: 'role-badge ' + p.role }, p.role),
-      el('div', { class: 'player-info' },
-        el('div', { class: 'player-name' }, p.name),
-        el('div', { class: 'player-meta' }, p.teamSerieA || '—')
-      ),
+      playerInfoEl(p),
       el('div', { class: 'qta-badge mono' }, String(p.qtA))
     );
     container.appendChild(card);
@@ -1747,6 +1841,11 @@ function initTabs() {
     state.search = e.target.value;
     renderPlayers();
   });
+  $('#player-sort').addEventListener('change', e => {
+    state.sortBy = e.target.value;
+    renderPlayers();
+    save();
+  });
   $$('#teams-view-toggle button').forEach(b => {
     b.addEventListener('click', () => {
       state.teamsView = b.dataset.view;
@@ -1849,12 +1948,42 @@ function initSettingsHandlers() {
     }
     e.target.value = '';
   });
+  $('#stats-file').addEventListener('change', async e => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const status = $('#stats-status');
+    status.textContent = 'Analisi in corso…';
+    status.style.color = 'var(--muted)';
+    try {
+      if (!state.stats) state.stats = { cur: null, prev: null };
+      const parsed = [];
+      for (const f of files) parsed.push(await parseStatsFile(f));
+      assignStatsSeasons(parsed);
+      save();
+      renderStatsStatus();
+      renderAll();
+      toast('Statistiche caricate', 'success');
+    } catch (err) {
+      status.textContent = '✗ ' + err.message;
+      status.style.color = 'var(--danger)';
+    }
+    e.target.value = '';
+  });
+  $('#btn-clear-stats').addEventListener('click', () => {
+    if (!confirm('Rimuovere le statistiche caricate?')) return;
+    state.stats = { cur: null, prev: null };
+    save();
+    renderStatsStatus();
+    renderAll();
+    toast('Statistiche rimosse', 'success');
+  });
   $('#btn-reset').addEventListener('click', () => {
     if (!confirm('Cancellare TUTTE le aste e ricominciare da zero?')) return;
     localStorage.removeItem(STORAGE_KEY);
     state = {
       version: CURRENT_VERSION, currentAuctionId: null, auctions: {},
-      activeTab: 'players', activeRole: 'ALL', teamsView: 'strip', search: ''
+      activeTab: 'players', activeRole: 'ALL', teamsView: 'strip', search: '',
+      sortBy: 'qta', stats: { cur: null, prev: null }
     };
     showSetup();
   });
@@ -1868,6 +1997,7 @@ function boot() {
   initPickPlayerHandlers();
   initTabs();
   initSettingsHandlers();
+  initSuggestHandlers();
   const ok = load();
   if (ok && ca()) {
     showMainApp();
@@ -1876,6 +2006,319 @@ function boot() {
     showSetup();
   }
 }
+// ============================================================
+//  STATISTICHE GIOCATORI  (import, matching, rendering, consigli)
+// ============================================================
+
+// Normalizza il nome per il match Quotazioni <-> Statistiche
+function normalizeName(s) {
+  return String(s || '').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+// Formatta un numero con d decimali (o '—' se non valido)
+function fmt(x, d) {
+  const n = Number(x);
+  return isFinite(n) ? n.toFixed(d) : '—';
+}
+
+// Classe colore per la % di titolarità
+function titClass(pct) {
+  if (pct >= 70) return 'tit-hi';
+  if (pct >= 40) return 'tit-mid';
+  return 'tit-lo';
+}
+
+// Legge un file "Statistiche" di Fantacalcio.it
+async function parseStatsFile(file) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const sheetName = wb.SheetNames.find(n => /tutti/i.test(n)) || wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+  // Stagione dal banner (riga 0): es. "... Stagione 2026 27" -> "2026-27"
+  let season = '';
+  const banner = (rows[0] || []).map(c => String(c || '')).join(' ');
+  const m = banner.match(/(\d{4})\D+(\d{2,4})/);
+  if (m) season = m[1] + '-' + m[2].slice(-2);
+
+  // Trova la riga di intestazione (Nome + Pv)
+  let hi = -1;
+  for (let i = 0; i < Math.min(rows.length, 6); i++) {
+    const row = rows[i].map(c => String(c || '').trim().toLowerCase());
+    if (row.includes('nome') && row.includes('pv')) { hi = i; break; }
+  }
+  if (hi < 0) throw new Error("Intestazione Statistiche non trovata (servono 'Nome' e 'Pv').");
+
+  const H = rows[hi].map(c => String(c || '').trim().toLowerCase());
+  const col = n => H.indexOf(n);
+  const iName = col('nome'), iTeam = col('squadra'), iRole = col('r'),
+        iPv = col('pv'), iMv = col('mv'), iFm = col('fm'), iGf = col('gf'),
+        iGs = col('gs'), iAss = col('ass'), iRp = col('rp'), iRc = col('rc'),
+        iRplus = col('r+'), iRminus = col('r-'), iAmm = col('amm'), iEsp = col('esp'), iAu = col('au');
+  if (iName < 0 || iPv < 0) throw new Error("Colonne Statistiche mancanti (Nome/Pv).");
+
+  const byKey = {};
+  let giornate = 0, count = 0;
+  for (const r of rows.slice(hi + 1)) {
+    const name = String(r[iName] || '').trim();
+    if (!name) continue;
+    const num = i => i >= 0 ? (Number(r[i]) || 0) : 0;
+    const pv = num(iPv);
+    if (pv > giornate) giornate = pv;
+    byKey[normalizeName(name)] = {
+      name,
+      team: iTeam >= 0 ? String(r[iTeam] || '').trim() : '',
+      role: iRole >= 0 ? String(r[iRole] || '').trim().toUpperCase() : '',
+      pv, mv: num(iMv), fm: num(iFm), gf: num(iGf), gs: num(iGs), ass: num(iAss),
+      rp: num(iRp), rc: num(iRc), rplus: num(iRplus), rminus: num(iRminus),
+      amm: num(iAmm), esp: num(iEsp), au: num(iAu)
+    };
+    count++;
+  }
+  if (count === 0) throw new Error('Nessun dato statistico trovato nel file.');
+  return { season, giornate, count, byKey };
+}
+
+// Unisce i file caricati nello stato, tenendo le 2 stagioni più recenti
+function assignStatsSeasons(list) {
+  if (!state.stats) state.stats = { cur: null, prev: null };
+  const have = [];
+  if (state.stats.cur) have.push(state.stats.cur);
+  if (state.stats.prev) have.push(state.stats.prev);
+  for (const p of list) {
+    const filtered = have.filter(h => !(p.season && h.season === p.season));
+    have.length = 0;
+    have.push(p, ...filtered);
+  }
+  have.sort((a, b) => (b.season || '').localeCompare(a.season || ''));
+  state.stats.cur = have[0] || null;
+  state.stats.prev = have[1] || null;
+}
+
+// Recupera le statistiche (stagione corrente e precedente) di un giocatore
+function getStats(p) {
+  const key = normalizeName(p.name);
+  const cur = (state.stats && state.stats.cur) ? state.stats.cur.byKey[key] : null;
+  const prev = (state.stats && state.stats.prev) ? state.stats.prev.byKey[key] : null;
+  return { cur: cur || null, prev: prev || null };
+}
+
+function statsSummaryLine(s) {
+  if (!s) return '—';
+  return (s.season || 'stagione ?') + ' · ' + s.count + ' giocatori · ' + s.giornate + ' giornate';
+}
+function renderStatsStatus() {
+  const box = $('#stats-status');
+  const clearBtn = $('#btn-clear-stats');
+  if (!box) return;
+  const has = state.stats && (state.stats.cur || state.stats.prev);
+  if (!has) {
+    box.textContent = 'Nessuna statistica caricata.';
+    box.style.color = 'var(--muted)';
+    if (clearBtn) clearBtn.style.display = 'none';
+    return;
+  }
+  box.style.color = 'var(--accent-2)';
+  box.innerHTML = '';
+  box.appendChild(el('div', {}, '✓ In corso: ' + statsSummaryLine(state.stats.cur)));
+  box.appendChild(el('div', {}, '✓ Precedente: ' + statsSummaryLine(state.stats.prev)));
+  if (clearBtn) clearBtn.style.display = '';
+}
+
+// Valore di un giocatore secondo l'ordinamento scelto
+function playerSortValue(p, by) {
+  const { cur, prev } = getStats(p);
+  const g = (state.stats && state.stats.cur) ? state.stats.cur.giornate : 0;
+  switch (by) {
+    case 'fm':     return (cur && cur.pv > 0) ? cur.fm : ((prev && prev.pv > 0) ? prev.fm : -1);
+    case 'gf':     return cur ? cur.gf : -1;
+    case 'gfprev': return prev ? prev.gf : -1;
+    case 'tit':    return (cur && g > 0) ? cur.pv / g : -1;
+    default:       return p.qtA;
+  }
+}
+function sortPlayers(arr) {
+  const by = state.sortBy || 'qta';
+  arr.sort((a, b) =>
+    (playerSortValue(b, by) - playerSortValue(a, by)) ||
+    (b.qtA - a.qtA) ||
+    a.name.localeCompare(b.name)
+  );
+  return arr;
+}
+// Ordinamento "convenienza" per i consigli: fantamedia poi gol poi Qt.A
+function scoreSort(arr) {
+  const score = p => {
+    const { cur, prev } = getStats(p);
+    const fm = (cur && cur.pv > 0) ? cur.fm : ((prev && prev.pv > 0) ? prev.fm : 0);
+    const gf = cur ? cur.gf : (prev ? prev.gf : 0);
+    return fm * 10 + gf;
+  };
+  arr.sort((a, b) => (score(b) - score(a)) || (b.qtA - a.qtA) || a.name.localeCompare(b.name));
+  return arr;
+}
+
+// Chip statistiche da mostrare sotto il nome nella lista
+function buildStatChips(p) {
+  const { cur, prev } = getStats(p);
+  if (!cur && !prev) return null;
+  const wrap = el('div', { class: 'player-stats' });
+  const isP = p.role === 'P';
+
+  const fm = (cur && cur.pv > 0) ? cur.fm : ((prev && prev.pv > 0) ? prev.fm : null);
+  if (fm != null) wrap.appendChild(el('span', { class: 'stat-chip fm' }, el('span', { class: 'lbl' }, 'FM'), fmt(fm, 2)));
+
+  const golC = cur ? (isP ? cur.gs : cur.gf) : null;
+  const golP = prev ? (isP ? prev.gs : prev.gf) : null;
+  if (golC != null || golP != null) {
+    let txt = (golC != null ? String(golC) : '–');
+    if (golP != null) txt += ' (' + golP + ')';
+    wrap.appendChild(el('span', { class: 'stat-chip gol' }, el('span', { class: 'lbl' }, isP ? 'GS' : 'G'), txt));
+  }
+
+  const g = (state.stats && state.stats.cur) ? state.stats.cur.giornate : 0;
+  if (cur && g > 0) {
+    const pct = Math.round(100 * cur.pv / g);
+    wrap.appendChild(el('span', { class: 'stat-chip ' + titClass(pct) }, el('span', { class: 'lbl' }, 'TIT'), pct + '%'));
+  }
+  return wrap;
+}
+
+// Classe colore per la card in base alla % di titolarità (stagione in corso)
+function titCardClass(p) {
+  const g = (state.stats && state.stats.cur) ? state.stats.cur.giornate : 0;
+  const { cur } = getStats(p);
+  if (!cur || !g) return '';
+  return ' ' + titClass(Math.round(100 * cur.pv / g));
+}
+
+// Blocco .player-info (nome + squadra + chip statistiche), riusato nelle liste
+function playerInfoEl(p) {
+  const info = el('div', { class: 'player-info' },
+    el('div', { class: 'player-name' }, p.name),
+    el('div', { class: 'player-meta' }, p.teamSerieA || '—')
+  );
+  const chips = buildStatChips(p);
+  if (chips) info.appendChild(chips);
+  return info;
+}
+
+// Tabella statistiche nel modale d'asta
+function renderModalStats(p) {
+  const box = $('#mod-stats');
+  if (!box) return;
+  const { cur, prev } = getStats(p);
+  const cols = [];
+  if (state.stats && state.stats.cur) cols.push({ label: state.stats.cur.season || 'In corso', data: cur, giornate: state.stats.cur.giornate });
+  if (state.stats && state.stats.prev) cols.push({ label: state.stats.prev.season || 'Prec.', data: prev, giornate: state.stats.prev.giornate });
+
+  if (!cols.length) {
+    box.className = '';
+    box.innerHTML = '';
+    box.appendChild(el('div', { class: 'mod-stats-empty' }, 'Statistiche non caricate. Aggiungile da Impostazioni.'));
+    return;
+  }
+
+  const isP = p.role === 'P';
+  const fmtCell = v => (v == null || v === '') ? el('td', { class: 'muted' }, '—') : el('td', {}, String(v));
+  const rowDefs = [
+    ['Presenze',   c => c.data ? (c.data.pv + (c.giornate ? '/' + c.giornate : '')) : null],
+    ['Titolarità', c => (c.data && c.giornate) ? Math.round(100 * c.data.pv / c.giornate) + '%' : null],
+    ['Media voto', c => (c.data && c.data.pv) ? fmt(c.data.mv, 2) : null],
+    ['Fantamedia', c => (c.data && c.data.pv) ? fmt(c.data.fm, 2) : null],
+    [isP ? 'Gol subiti' : 'Gol fatti', c => c.data ? (isP ? c.data.gs : c.data.gf) : null],
+    ['Assist',     c => c.data ? c.data.ass : null],
+  ];
+  if (!isP) rowDefs.push(['Rig. segnati', c => c.data ? c.data.rplus : null]);
+
+  const thead = el('thead', {}, el('tr', {}, el('th', {}, ''), ...cols.map(c => el('th', {}, c.label))));
+  const tbody = el('tbody', {});
+  for (const [label, fn] of rowDefs) {
+    tbody.appendChild(el('tr', {}, el('th', {}, label), ...cols.map(c => fmtCell(fn(c)))));
+  }
+  box.className = 'mod-stats';
+  box.innerHTML = '';
+  box.appendChild(el('table', {}, thead, tbody));
+}
+
+// ---------- Consigli "completa la rosa" ----------
+let suggestTeamId = null;
+function openSuggestModal(teamId) {
+  const team = ca() && ca().teams.find(t => t.id === teamId);
+  if (!team) return;
+  suggestTeamId = teamId;
+  $('#sg-team-name').textContent = team.name;
+  const slotsLeft = teamSlotsLeft(team);
+  $('#sg-budget').textContent = teamBudget(team) + 'cr disponibili · ' + slotsLeft +
+    ' slot da riempire · max ' + maxBidForTeam(team) + 'cr a giocatore';
+  renderSuggestBody(team);
+  $('#suggest-modal').classList.remove('hidden');
+}
+function closeSuggestModal() {
+  $('#suggest-modal').classList.add('hidden');
+  suggestTeamId = null;
+}
+function renderSuggestBody(team) {
+  const body = $('#sg-body');
+  body.innerHTML = '';
+  const g = (state.stats && state.stats.cur) ? state.stats.cur.giornate : 0;
+  const maxBid = maxBidForTeam(team);
+  const available = ca().players.filter(p => !p.assigned);
+  let anyNeed = false;
+
+  for (const r of ROLE_ORDER) {
+    const need = SLOTS[r] - teamRoleCount(team, r);
+    if (need <= 0) continue;
+    anyNeed = true;
+
+    const pool = available.filter(p => p.role === r);
+    scoreSort(pool);
+    const top = pool.slice(0, 6);
+
+    const block = el('div', { class: 'suggest-role-block' });
+    block.appendChild(el('h4', {}, ROLE_LABEL[r], el('span', { class: 'need' }, 'mancano ' + need)));
+
+    if (!top.length) {
+      block.appendChild(el('div', { class: 'mod-stats-empty' }, 'Nessun giocatore disponibile.'));
+    }
+    for (const p of top) {
+      const { cur, prev } = getStats(p);
+      const isP = p.role === 'P';
+      const bits = [];
+      const fm = (cur && cur.pv > 0) ? cur.fm : ((prev && prev.pv > 0) ? prev.fm : null);
+      if (fm != null) bits.push('FM ' + fmt(fm, 2));
+      const golC = cur ? (isP ? cur.gs : cur.gf) : null;
+      const golP = prev ? (isP ? prev.gs : prev.gf) : null;
+      if (golC != null || golP != null) {
+        bits.push((isP ? 'GS ' : 'G ') + (golC != null ? golC : '–') + (golP != null ? ' (' + golP + ')' : ''));
+      }
+      if (cur && g > 0) bits.push('TIT ' + Math.round(100 * cur.pv / g) + '%');
+      const affordable = p.qtA <= maxBid;
+
+      const item = el('div', { class: 'suggest-item', onclick: () => { closeSuggestModal(); openAuctionModal(p, team.id); } },
+        el('div', { class: 'role-badge ' + p.role, style: 'width:24px;height:24px;font-size:11px;' }, p.role),
+        el('div', { style: 'flex:1;min-width:0;' },
+          el('div', { class: 's-name' }, p.name + (affordable ? '' : ' ⚠')),
+          el('div', { class: 's-stats' }, bits.length ? bits.join(' · ') : (p.teamSerieA || '—'))
+        ),
+        el('div', { class: 's-qta mono' }, 'Qt.A ' + p.qtA)
+      );
+      block.appendChild(item);
+    }
+    body.appendChild(block);
+  }
+  if (!anyNeed) body.appendChild(el('div', { class: 'mod-stats-empty' }, 'Rosa già completa 🎉'));
+}
+function initSuggestHandlers() {
+  $('#sg-close').addEventListener('click', closeSuggestModal);
+  $('#suggest-modal').addEventListener('click', e => {
+    if (e.target.id === 'suggest-modal') closeSuggestModal();
+  });
+}
+
 document.addEventListener('DOMContentLoaded', boot);
 </script>
 </body>

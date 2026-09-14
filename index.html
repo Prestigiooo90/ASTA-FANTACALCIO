@@ -239,6 +239,29 @@
   .mod-stats td.muted { color: var(--muted); }
   .mod-stats-empty { font-size: 12px; color: var(--muted); margin: 10px 0 2px; }
 
+  /* Box consiglio spesa (per la squadra dell'utente) */
+  .mod-advice { margin: 10px 0 2px; padding: 10px 12px; border-radius: var(--radius-sm); background: #eef2ff; border: 1px solid #c7d2fe; }
+  .mod-advice.full { background: #f3f4f6; border-color: #e5e7eb; }
+  .mod-advice .adv-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .mod-advice .adv-label { font-size: 12px; color: #4338ca; font-weight: 700; }
+  .mod-advice .adv-max { font-size: 22px; font-weight: 800; color: #3730a3; white-space: nowrap; }
+  .mod-advice .adv-max small { font-size: 12px; font-weight: 600; color: #6366f1; }
+  .mod-advice .adv-reasons { margin-top: 6px; font-size: 12px; color: #4b5563; display: flex; flex-wrap: wrap; gap: 2px 10px; }
+  .mod-advice .adv-reasons span::before { content: '• '; color: #a5b4fc; }
+  .mod-advice .adv-note { margin-top: 6px; font-size: 11px; color: #6b7280; }
+  .mod-advice .adv-use { margin-top: 8px; padding: 6px 10px; font-size: 12px; }
+  .mod-advice .adv-market { margin-top: 6px; font-size: 12px; color: #374151; }
+  .mod-advice .adv-plan { margin-top: 5px; font-size: 11px; color: #6b7280; }
+
+  .stat-chip.pop { background: #fff7ed; color: #9a3412; }
+
+  /* Piano rosa nel modale suggerimenti */
+  .sg-plan { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
+  .sg-plan .cell { text-align: center; font-size: 11px; color: var(--muted); background: #f9fafb; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 4px; }
+  .sg-plan .cell b { display: block; color: var(--text); font-size: 12px; margin-bottom: 2px; }
+  .suggest-sub { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: #6b7280; margin: 10px 0 4px; }
+  .suggest-item .s-max { font-size: 11px; color: #4338ca; font-weight: 700; margin-top: 2px; }
+
   /* Suggerimenti "completa la rosa" */
   .btn-suggest {
     border: none; background: #eef2ff; color: #4338ca; cursor: pointer;
@@ -654,6 +677,14 @@
       </div>
 
       <div class="settings-card">
+        <h3>Prezzi &amp; popolarità d'asta (opzionale)</h3>
+        <p>Carica il CSV <strong>"i più comprati"</strong> (fantacalcio-online). Aggiunge il <strong>prezzo medio d'asta reale</strong> e la <strong>% di squadre che comprano</strong> ogni giocatore: il consiglio di spesa userà il prezzo di mercato, mostrerà l'appetibilità e ridimensionerà il piano rosa.</p>
+        <input type="file" id="market-file" accept=".csv,.xlsx,.xls" />
+        <p id="market-status" style="margin-top:8px;font-size:12px;"></p>
+        <button class="btn secondary" id="btn-clear-market" style="margin-top:6px;display:none;">Rimuovi prezzi</button>
+      </div>
+
+      <div class="settings-card">
         <h3 style="color:var(--danger);">Zona pericolo</h3>
         <p>Reset totale: cancella <strong>tutte</strong> le aste, tutti i dati. Non si può annullare.</p>
         <button class="btn danger" id="btn-reset">Reset totale</button>
@@ -679,6 +710,7 @@
     </div>
 
     <div id="mod-stats"></div>
+    <div id="mod-advice"></div>
 
     <label for="mod-price">Prezzo di aggiudicazione</label>
     <input type="number" class="price-input mono" id="mod-price" min="1" inputmode="numeric" />
@@ -819,7 +851,9 @@ let state = {
   search: '',
   sortBy: 'qta',
   // Statistiche giocatori (dati di riferimento, condivisi fra tutte le aste)
-  stats: { cur: null, prev: null }
+  stats: { cur: null, prev: null },
+  // Listino prezzi & popolarità d'asta (i più comprati)
+  market: null
 };
 
 // ---------- Persistenza + migrazione ----------
@@ -1394,6 +1428,7 @@ function renderSettings() {
   renderAuctionList();
   renderSettingsTeams();
   renderStatsStatus();
+  renderMarketStatus();
 }
 function renderAuctionList() {
   const container = $('#auction-list');
@@ -1477,6 +1512,7 @@ function openAuctionModal(player, presetTeamId) {
   $('#mod-meta').textContent = ROLE_LABEL[player.role].replace(/i$/, 'e') + ' — ' + (player.teamSerieA || '—');
   $('#mod-qta').textContent = player.qtA;
   renderModalStats(player);
+  renderSpendAdvice(player);
   const priceInput = $('#mod-price');
   priceInput.value = 1; // rilancio base: parte sempre da 1, poi digiti il valore finale
   $('#mod-teams').dataset.selected = presetTeamId || '';
@@ -1977,14 +2013,44 @@ function initSettingsHandlers() {
     renderAll();
     toast('Statistiche rimosse', 'success');
   });
+  $('#market-file').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const status = $('#market-status');
+    status.textContent = 'Analisi in corso…';
+    status.style.color = 'var(--muted)';
+    try {
+      const parsed = await parseMarketFile(f);
+      state.market = parsed;
+      resetMarketCaches();
+      save();
+      renderMarketStatus();
+      renderAll();
+      toast('Prezzi caricati (' + parsed.count + ')', 'success');
+    } catch (err) {
+      status.textContent = '✗ ' + err.message;
+      status.style.color = 'var(--danger)';
+    }
+    e.target.value = '';
+  });
+  $('#btn-clear-market').addEventListener('click', () => {
+    if (!confirm('Rimuovere il listino prezzi?')) return;
+    state.market = null;
+    resetMarketCaches();
+    save();
+    renderMarketStatus();
+    renderAll();
+    toast('Prezzi rimossi', 'success');
+  });
   $('#btn-reset').addEventListener('click', () => {
     if (!confirm('Cancellare TUTTE le aste e ricominciare da zero?')) return;
     localStorage.removeItem(STORAGE_KEY);
     state = {
       version: CURRENT_VERSION, currentAuctionId: null, auctions: {},
       activeTab: 'players', activeRole: 'ALL', teamsView: 'strip', search: '',
-      sortBy: 'qta', stats: { cur: null, prev: null }
+      sortBy: 'qta', stats: { cur: null, prev: null }, market: null
     };
+    resetMarketCaches();
     showSetup();
   });
 }
@@ -2149,13 +2215,20 @@ function sortPlayers(arr) {
   );
   return arr;
 }
-// Ordinamento "convenienza" per i consigli: fantamedia poi gol poi Qt.A
+// Ordinamento "convenienza" per i consigli: fantamedia (mista) + gol, penalizzando chi non gioca
 function scoreSort(arr) {
+  const g = (state.stats && state.stats.cur) ? state.stats.cur.giornate : 0;
   const score = p => {
     const { cur, prev } = getStats(p);
-    const fm = (cur && cur.pv > 0) ? cur.fm : ((prev && prev.pv > 0) ? prev.fm : 0);
+    const pot = playerPotential(p);
+    const fm = pot.blendFM != null ? pot.blendFM : 0;
     const gf = cur ? cur.gf : (prev ? prev.gf : 0);
-    return fm * 10 + gf;
+    let s = fm * 10 + gf;
+    if (pot.titPct != null && g >= 3) {
+      if (pot.titPct < 0.2) s *= 0.5;
+      else if (pot.titPct < 0.4) s *= 0.75;
+    }
+    return s;
   };
   arr.sort((a, b) => (score(b) - score(a)) || (b.qtA - a.qtA) || a.name.localeCompare(b.name));
   return arr;
@@ -2164,7 +2237,8 @@ function scoreSort(arr) {
 // Chip statistiche da mostrare sotto il nome nella lista
 function buildStatChips(p) {
   const { cur, prev } = getStats(p);
-  if (!cur && !prev) return null;
+  const mkt = marketFor(p);
+  if (!cur && !prev && !mkt) return null;
   const wrap = el('div', { class: 'player-stats' });
   const isP = p.role === 'P';
 
@@ -2184,7 +2258,10 @@ function buildStatChips(p) {
     const pct = Math.round(100 * cur.pv / g);
     wrap.appendChild(el('span', { class: 'stat-chip ' + titClass(pct) }, el('span', { class: 'lbl' }, 'TIT'), pct + '%'));
   }
-  return wrap;
+  if (mkt && mkt.comprato != null) {
+    wrap.appendChild(el('span', { class: 'stat-chip pop' }, el('span', { class: 'lbl' }, '👥'), fmt(mkt.comprato, 0) + '%'));
+  }
+  return wrap.childNodes.length ? wrap : null;
 }
 
 // Classe colore per la card in base alla % di titolarità (stagione in corso)
@@ -2244,6 +2321,327 @@ function renderModalStats(p) {
   box.appendChild(el('table', {}, thead, tbody));
 }
 
+// ============================================================
+//  PREZZI & POPOLARITÀ D'ASTA  (CSV "i più comprati") + PIANO ROSA
+// ============================================================
+// Ripartizione budget per reparto (base 500) — dipende dal n. di partecipanti (fonte: Fantacalcio Online)
+const SPLIT_ANCHORS = {
+  8:  { P: 0.070, D: 0.15, C: 0.250, A: 0.53 },
+  10: { P: 0.075, D: 0.16, C: 0.245, A: 0.52 }
+};
+function splitForTeams(n) {
+  const a = SPLIT_ANCHORS[8], b = SPLIT_ANCHORS[10];
+  const t = Math.max(0, Math.min(1, ((n || 8) - 8) / 2));  // 8→8-lega, 10→10-lega, clamp oltre
+  const raw = {}; let sum = 0;
+  for (const r of ROLE_ORDER) { raw[r] = a[r] + t * (b[r] - a[r]); sum += raw[r]; }
+  for (const r of ROLE_ORDER) raw[r] /= sum;               // normalizza a 1
+  return raw;
+}
+const STRONG_TARGETS = { P: 1, D: 3, C: 4, A: 3 };          // "forti" per reparto (il resto = riserve a poco)
+
+// Normalizzazione forte per il match dei nomi (cognome concatenato, solo alfanumerico)
+function norm2(s) {
+  s = String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return s.replace(/[^a-z0-9]/g, '');
+}
+// Interpreta numeri IT/EU: "40,8%" -> 40.8 · "205.56" -> 205.56 · "1.234,5" -> 1234.5
+function numberIt(s) {
+  s = String(s == null ? '' : s).trim().replace('%', '').trim();
+  if (!s) return null;
+  if (s.indexOf(',') >= 0 && s.indexOf('.') >= 0) s = s.replace(/\./g, '').replace(',', '.');
+  else if (s.indexOf(',') >= 0) s = s.replace(',', '.');
+  const n = parseFloat(s);
+  return isFinite(n) ? n : null;
+}
+// Parser CSV minimale (virgolette + "" di escape)
+function parseCSV(text) {
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const rows = []; let row = [], field = '', i = 0, inq = false;
+  while (i < text.length) {
+    const c = text[i];
+    if (inq) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inq = false; }
+      else field += c;
+    } else {
+      if (c === '"') inq = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c !== '\r') field += c;
+    }
+    i++;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+// Legge il file "i più comprati" (CSV o XLSX)
+async function parseMarketFile(file) {
+  let rows;
+  if (/\.csv$/i.test(file.name)) rows = parseCSV(await file.text());
+  else {
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const sh = wb.Sheets[wb.SheetNames[0]];
+    rows = XLSX.utils.sheet_to_json(sh, { header: 1, defval: '' }).map(r => r.map(c => String(c == null ? '' : c)));
+  }
+  let hi = -1;
+  for (let i = 0; i < Math.min(rows.length, 5); i++) {
+    const low = rows[i].map(c => String(c || '').trim().toLowerCase());
+    if (low.some(x => x === 'squadra') && low.some(x => /comprat/.test(x))) { hi = i; break; }
+  }
+  if (hi < 0) throw new Error('Intestazione non riconosciuta (servono Squadra e "Comprato da").');
+  const H = rows[hi].map(c => String(c || '').trim().toLowerCase());
+  const find = (...names) => { for (const n of names) { const k = H.findIndex(h => h === n || h.includes(n)); if (k >= 0) return k; } return -1; };
+  const iRole = find('ruolo'), iTeam = find('squadra'), iCog = find('cognome', 'nome'),
+        iKap = find('kap'), iComp = find('comprato_pct', 'comprato'),
+        iP350 = find('prezzo350', 'prezzo 350'), iP500 = find('prezzo500', 'prezzo 500'),
+        iTrend = find('sette_gg', '7 gg', '7gg');
+  if (iTeam < 0 || iCog < 0) throw new Error('Colonne mancanti (squadra/cognome).');
+  const list = [];
+  for (const r of rows.slice(hi + 1)) {
+    const cognome = String(r[iCog] || '').trim();
+    if (!cognome) continue;
+    list.push({
+      role: iRole >= 0 ? String(r[iRole] || '').trim().toUpperCase() : '',
+      team: iTeam >= 0 ? String(r[iTeam] || '').trim() : '',
+      sc: norm2(cognome),
+      kap: iKap >= 0 ? (numberIt(r[iKap]) || 0) : 0,
+      comprato: iComp >= 0 ? numberIt(r[iComp]) : null,
+      p350: iP350 >= 0 ? numberIt(r[iP350]) : null,
+      p500: iP500 >= 0 ? numberIt(r[iP500]) : null,
+      trend: iTrend >= 0 ? numberIt(r[iTrend]) : null
+    });
+  }
+  if (!list.length) throw new Error('Nessun giocatore nel file.');
+  return { count: list.length, updated: new Date().toISOString().slice(0, 10), list };
+}
+
+let _marketIndex = null;      // { teamNorm: [rows] }
+let _marketCache = new Map(); // "team|name" -> row|null
+function resetMarketCaches() { _marketIndex = null; _marketCache = new Map(); }
+function ensureMarketIndex() {
+  if (_marketIndex) return _marketIndex;
+  _marketIndex = {};
+  if (state.market && state.market.list) {
+    for (const r of state.market.list) {
+      const t = norm2(r.team);
+      (_marketIndex[t] = _marketIndex[t] || []).push(r);
+    }
+  }
+  return _marketIndex;
+}
+// Riga di mercato per un giocatore (match squadra + prefisso cognome; ~98% di copertura)
+function marketFor(p) {
+  if (!state.market) return null;
+  const key = norm2(p.name), team = norm2(p.teamSerieA), ck = team + '|' + key;
+  if (_marketCache.has(ck)) return _marketCache.get(ck);
+  const cands = ensureMarketIndex()[team] || [];
+  const hits = cands.filter(c => c.sc && (c.sc.startsWith(key) || key.startsWith(c.sc)));
+  let best = null;
+  if (hits.length === 1) best = hits[0];
+  else if (hits.length > 1) {
+    const cp = c => { let n = 0; while (n < c.sc.length && n < key.length && c.sc[n] === key[n]) n++; return n; };
+    hits.sort((a, b) => cp(b) - cp(a)); best = hits[0];
+  }
+  _marketCache.set(ck, best);
+  return best;
+}
+function renderMarketStatus() {
+  const box = $('#market-status'), clearBtn = $('#btn-clear-market');
+  if (!box) return;
+  if (!state.market) {
+    box.textContent = 'Nessun listino prezzi caricato.'; box.style.color = 'var(--muted)';
+    if (clearBtn) clearBtn.style.display = 'none'; return;
+  }
+  let matched = 0, tot = 0;
+  if (ca()) for (const p of ca().players) { tot++; if (marketFor(p)) matched++; }
+  box.style.color = 'var(--accent-2)';
+  box.innerHTML = '';
+  box.appendChild(el('div', {}, '✓ ' + state.market.count + ' giocatori · aggiornato ' + (state.market.updated || '?')));
+  if (tot) box.appendChild(el('div', {}, 'Abbinati ' + matched + '/' + tot + ' giocatori dell\'asta'));
+  if (clearBtn) clearBtn.style.display = '';
+}
+
+// Piano rosa per una squadra: budget per reparto, "forti" vs riserve, ridimensionato sugli acquisti
+function rosterPlan(team) {
+  const B = ca().initialBudget || DEFAULT_BUDGET;
+  const split = splitForTeams(ca().teams.length);
+  const plan = {};
+  for (const r of ROLE_ORDER) {
+    const inRole = team.players.filter(p => p.role === r);
+    const bought = inRole.length;
+    const spent = inRole.reduce((s, p) => s + (p.price || 0), 0);
+    const target = Math.round(split[r] * B);
+    const strong = STRONG_TARGETS[r], fillers = SLOTS[r] - strong;
+    const strongBought = Math.min(bought, strong);   // i più costosi contano come "forti"
+    const fillerBought = bought - strongBought;
+    const strongLeft = Math.max(0, strong - strongBought);
+    const fillerLeft = Math.max(0, fillers - fillerBought);
+    const slotsLeft = SLOTS[r] - bought;
+    const remaining = Math.max(0, target - spent);
+    const strongBudget = Math.max(0, remaining - fillerLeft * 1);
+    const perStrong = strongLeft > 0 ? strongBudget / strongLeft : 0;
+    plan[r] = { target, spent, remaining, bought, slotsLeft, strong, fillers, strongLeft, fillerLeft, strongBudget, perStrong };
+  }
+  return plan;
+}
+// Tetto suggerito dal piano per un giocatore di ruolo r
+function planMaxForPlayer(team, r, pr) {
+  const teamCap = maxBidForTeam(team);
+  if (pr.slotsLeft <= 0) return 0;
+  let maxPlan;
+  if (pr.strongLeft > 0) maxPlan = pr.strongBudget - (pr.strongLeft - 1) * 1; // puoi concentrare su 1
+  else maxPlan = Math.max(2, Math.round(pr.remaining / Math.max(1, pr.fillerLeft))); // solo riserve
+  return Math.max(1, Math.min(maxPlan, teamCap));
+}
+function roleStrategyText(r) {
+  if (r === 'D') return '3 forti + riserve';
+  if (r === 'C') return '4 forti + riserve';
+  if (r === 'A') return '1 top · o 1 forte+2 medi · o 3 medi';
+  return '1 titolare + 2 riserve';
+}
+
+// ---------- Consiglio di spesa per la MIA squadra ----------
+// La "mia" squadra: quella chiamata "Prestigiosa" (o simile), altrimenti la prima.
+function myTeam() {
+  if (!ca() || !ca().teams.length) return null;
+  return ca().teams.find(t => /prestigios/i.test(t.name)) || ca().teams[0];
+}
+
+// Potenziale del giocatore: fattore moltiplicativo (0.5–1.8) + motivazioni leggibili.
+// Combina fantamedia (corrente + precedente pesate sulle presenze), titolarità e bonus.
+function playerPotential(p) {
+  const { cur, prev } = getStats(p);
+  const g = (state.stats && state.stats.cur) ? state.stats.cur.giornate : 0;
+  const reasons = [];
+  let factor = 1;
+
+  const curOK = cur && cur.pv > 0, prevOK = prev && prev.pv > 0;
+  let blendFM = null;
+  if (curOK && prevOK) {
+    const wCur = cur.pv, wPrev = Math.min(prev.pv, 20) * 0.5;
+    blendFM = (cur.fm * wCur + prev.fm * wPrev) / (wCur + wPrev);
+  } else if (curOK) blendFM = cur.fm;
+  else if (prevOK) blendFM = prev.fm;
+
+  if (blendFM != null) {
+    factor *= Math.max(0.75, Math.min(1.35, 1 + (blendFM - 6.2) * 0.16));
+    if (blendFM >= 7.2) reasons.push('Rendimento alto (FM ' + blendFM.toFixed(2) + ')');
+    else if (blendFM >= 6.5) reasons.push('Buon rendimento (FM ' + blendFM.toFixed(2) + ')');
+    else if (blendFM < 5.8) reasons.push('Rendimento basso (FM ' + blendFM.toFixed(2) + ')');
+  } else {
+    reasons.push('Nessun dato: prezzo sul valore di listino');
+  }
+
+  let titPct = null;
+  if (cur && g > 0) {
+    titPct = cur.pv / g;
+    if (g >= 3) {
+      if (titPct >= 0.85) { factor *= 1.15; reasons.push('Titolare fisso (' + Math.round(titPct * 100) + '%)'); }
+      else if (titPct >= 0.6) { factor *= 1.06; reasons.push('Spesso titolare (' + Math.round(titPct * 100) + '%)'); }
+      else if (titPct >= 0.4) { factor *= 1.0; }
+      else if (titPct >= 0.2) { factor *= 0.82; reasons.push('Poco impiegato (' + Math.round(titPct * 100) + '%)'); }
+      else { factor *= 0.6; reasons.push('Quasi mai in campo (' + Math.round(titPct * 100) + '%)'); }
+    }
+  }
+
+  if (p.role === 'A' || p.role === 'C') {
+    let rate = 0, golTot = 0;
+    if (curOK) { rate = (cur.gf + 0.5 * cur.ass) / cur.pv; golTot = cur.gf; }
+    else if (prevOK) { rate = (prev.gf + 0.5 * prev.ass) / prev.pv; golTot = prev.gf; }
+    if (rate > 0) {
+      factor *= Math.min(1.3, 1 + rate * 0.18);
+      if (rate >= 0.4) reasons.push('Garanzia di bonus (' + golTot + ' gol)');
+      else if (rate >= 0.15) reasons.push('Porta bonus');
+    }
+  }
+
+  factor = Math.max(0.5, Math.min(1.8, factor));
+  return { factor, blendFM, titPct, reasons };
+}
+
+// Consiglio di spesa massima su un giocatore per una squadra (default: la mia).
+function spendAdvice(p, team) {
+  team = team || myTeam();
+  if (!team) return null;
+  const B = ca().initialBudget || DEFAULT_BUDGET;
+  const scale = B / 500;                         // prezzi/Qt.A sono tarati su un budget classico da 500
+  const roleFull = teamRoleCount(team, p.role) >= SLOTS[p.role];
+  const cap = maxBidForTeam(team);               // tetto: lascia ≥1 credito per ogni altro slot
+  const plan = rosterPlan(team)[p.role];
+  const pot = playerPotential(p);
+  const reasons = pot.reasons.slice();
+
+  // Valore del giocatore: prezzo di mercato reale (temperato) oppure fallback su listino
+  const m = marketFor(p);
+  const market = (m && m.p500 != null) ? m.p500 * scale : null;
+  let valore, basis;
+  if (market != null) {
+    let hype = 1.0; // il prezzo di mercato è gonfiato dall'hype: lo tempero con titolarità/rendimento
+    if (pot.titPct != null) { if (pot.titPct < 0.4) hype *= 0.7; else if (pot.titPct < 0.6) hype *= 0.9; else if (pot.titPct >= 0.85) hype *= 1.03; }
+    if (pot.blendFM != null) { if (pot.blendFM >= 7) hype *= 1.03; else if (pot.blendFM < 5.8) hype *= 0.9; }
+    hype = Math.max(0.6, Math.min(1.0, hype)); // mai sopra il prezzo medio di mercato (è già un tetto)
+    valore = Math.max(1, Math.round(market * hype));
+    basis = 'mercato';
+  } else {
+    valore = Math.max(1, Math.round(p.qtA * scale * pot.factor));
+    basis = 'listino';
+  }
+
+  const planMax = planMaxForPlayer(team, p.role, plan);
+  const asFiller = plan.strongLeft <= 0 && plan.slotsLeft > 0;
+  const suggested = Math.max(1, Math.min(valore, planMax, cap));
+  const limitedBy = suggested < valore ? (planMax <= cap ? 'piano' : 'budget') : null;
+
+  return {
+    team, valore, basis, suggested, roleFull, cap, plan,
+    market: market != null ? Math.round(market) : null,
+    comprato: m ? m.comprato : null,
+    asFiller, limitedBy, reasons
+  };
+}
+
+function renderSpendAdvice(p) {
+  const box = $('#mod-advice');
+  if (!box) return;
+  box.innerHTML = '';
+  const adv = spendAdvice(p);
+  if (!adv) { box.className = ''; return; }
+
+  if (adv.roleFull) {
+    box.className = 'mod-advice full';
+    box.appendChild(el('div', { class: 'adv-label' }, '💰 ' + adv.team.name));
+    box.appendChild(el('div', { class: 'adv-note' }, 'Slot ' + p.role + ' già completi: non ti serve questo giocatore.'));
+    return;
+  }
+
+  box.className = 'mod-advice';
+  box.appendChild(el('div', { class: 'adv-top' },
+    el('div', { class: 'adv-label' }, '💰 Max consigliato · ' + adv.team.name),
+    el('div', { class: 'adv-max' }, String(adv.suggested), el('small', {}, ' cr'))
+  ));
+  const rs = adv.reasons.slice();
+  if (adv.asFiller) rs.unshift('Slot da titolare ' + p.role + ' pieni → prendilo solo come riserva a poco');
+  if (rs.length) box.appendChild(el('div', { class: 'adv-reasons' }, ...rs.map(r => el('span', {}, r))));
+
+  const mbits = [];
+  if (adv.market != null) mbits.push('Mercato ~' + adv.market + 'cr');
+  else mbits.push('Nessun prezzo di mercato: uso il listino');
+  if (adv.comprato != null) mbits.push('comprato dal ' + fmt(adv.comprato, 1) + '%' + (adv.comprato >= 15 ? ' 🔥' : ''));
+  box.appendChild(el('div', { class: 'adv-market' }, mbits.join(' · ')));
+
+  const pl = adv.plan;
+  const planEl = el('div', { class: 'adv-plan' },
+    'Piano ' + p.role + ': ' + pl.spent + '/' + pl.target + 'cr · restano ' + pl.strongLeft + ' big + ' + pl.fillerLeft + ' low');
+  if (adv.limitedBy) planEl.appendChild(el('span', {}, ' · limitato dal ' + adv.limitedBy));
+  box.appendChild(planEl);
+
+  box.appendChild(el('button', { class: 'btn secondary adv-use', onclick: () => {
+    const pi = $('#mod-price');
+    pi.value = adv.suggested;
+    pi.dispatchEvent(new Event('input', { bubbles: true }));
+    pi.focus();
+  } }, 'Imposta come prezzo'));
+}
+
 // ---------- Consigli "completa la rosa" ----------
 let suggestTeamId = null;
 function openSuggestModal(teamId) {
@@ -2261,52 +2659,83 @@ function closeSuggestModal() {
   $('#suggest-modal').classList.add('hidden');
   suggestTeamId = null;
 }
+function suggestItem(p, team, g) {
+  const { cur, prev } = getStats(p);
+  const isP = p.role === 'P';
+  const bits = [];
+  const fm = (cur && cur.pv > 0) ? cur.fm : ((prev && prev.pv > 0) ? prev.fm : null);
+  if (fm != null) bits.push('FM ' + fmt(fm, 2));
+  const golC = cur ? (isP ? cur.gs : cur.gf) : null, golP = prev ? (isP ? prev.gs : prev.gf) : null;
+  if (golC != null || golP != null) bits.push((isP ? 'GS ' : 'G ') + (golC != null ? golC : '–') + (golP != null ? ' (' + golP + ')' : ''));
+  if (cur && g > 0) bits.push('TIT ' + Math.round(100 * cur.pv / g) + '%');
+  const m = marketFor(p);
+  if (m && m.comprato != null) bits.push('👥 ' + fmt(m.comprato, 0) + '%');
+  const adv = spendAdvice(p, team);
+  const priceRight = (m && m.p500 != null) ? ('~' + Math.round(m.p500) + 'cr') : ('Qt.A ' + p.qtA);
+  return el('div', { class: 'suggest-item', onclick: () => { closeSuggestModal(); openAuctionModal(p, team.id); } },
+    el('div', { class: 'role-badge ' + p.role, style: 'width:24px;height:24px;font-size:11px;' }, p.role),
+    el('div', { style: 'flex:1;min-width:0;' },
+      el('div', { class: 's-name' }, p.name),
+      el('div', { class: 's-stats' }, bits.length ? bits.join(' · ') : (p.teamSerieA || '—'))
+    ),
+    el('div', { style: 'text-align:right;' },
+      el('div', { class: 's-qta mono' }, priceRight),
+      adv ? el('div', { class: 's-max' }, 'max ' + adv.suggested + 'cr') : null
+    )
+  );
+}
 function renderSuggestBody(team) {
   const body = $('#sg-body');
   body.innerHTML = '';
   const g = (state.stats && state.stats.cur) ? state.stats.cur.giornate : 0;
-  const maxBid = maxBidForTeam(team);
   const available = ca().players.filter(p => !p.assigned);
-  let anyNeed = false;
+  const plan = rosterPlan(team);
+  const nTeams = ca().teams.length;
 
+  body.appendChild(el('div', { style: 'font-size:11px;color:var(--muted);margin-bottom:6px;' },
+    'Piano su ' + nTeams + ' squadre · budget ' + (ca().initialBudget || DEFAULT_BUDGET) + 'cr'));
+
+  // Riepilogo piano: speso/target e big/low residui per reparto
+  const grid = el('div', { class: 'sg-plan' });
   for (const r of ROLE_ORDER) {
-    const need = SLOTS[r] - teamRoleCount(team, r);
-    if (need <= 0) continue;
-    anyNeed = true;
+    const pl = plan[r];
+    grid.appendChild(el('div', { class: 'cell' },
+      el('b', {}, r + ' ' + pl.spent + '/' + pl.target),
+      pl.slotsLeft > 0 ? ('big ' + pl.strongLeft + ' · low ' + pl.fillerLeft) : 'completo ✓'
+    ));
+  }
+  body.appendChild(grid);
 
+  let anyNeed = false;
+  for (const r of ROLE_ORDER) {
+    const pl = plan[r];
+    if (pl.slotsLeft <= 0) continue;
+    anyNeed = true;
     const pool = available.filter(p => p.role === r);
-    scoreSort(pool);
-    const top = pool.slice(0, 6);
 
     const block = el('div', { class: 'suggest-role-block' });
-    block.appendChild(el('h4', {}, ROLE_LABEL[r], el('span', { class: 'need' }, 'mancano ' + need)));
+    block.appendChild(el('h4', {}, ROLE_LABEL[r],
+      el('span', { class: 'need' }, 'restano ' + pl.slotsLeft + ' · ' + roleStrategyText(r))));
 
-    if (!top.length) {
-      block.appendChild(el('div', { class: 'mod-stats-empty' }, 'Nessun giocatore disponibile.'));
+    // Da titolare (i forti): ordina per valore/quotazione (i big del reparto), non per la FM di inizio stagione
+    if (pl.strongLeft > 0) {
+      const big = pool.slice();
+      const valOf = q => { const m = marketFor(q); return (m && m.p500 != null) ? m.p500 : q.qtA; };
+      big.sort((a, b) => (valOf(b) - valOf(a)) || (b.qtA - a.qtA) || a.name.localeCompare(b.name));
+      block.appendChild(el('div', { class: 'suggest-sub' },
+        'Da titolare — ' + pl.strongLeft + ' da prendere · budget ~' + Math.max(1, Math.round(pl.perStrong)) + 'cr l\'uno'));
+      const bigTop = big.slice(0, 5);
+      if (!bigTop.length) block.appendChild(el('div', { class: 'mod-stats-empty' }, 'Nessun giocatore disponibile.'));
+      for (const p of bigTop) block.appendChild(suggestItem(p, team, g));
     }
-    for (const p of top) {
-      const { cur, prev } = getStats(p);
-      const isP = p.role === 'P';
-      const bits = [];
-      const fm = (cur && cur.pv > 0) ? cur.fm : ((prev && prev.pv > 0) ? prev.fm : null);
-      if (fm != null) bits.push('FM ' + fmt(fm, 2));
-      const golC = cur ? (isP ? cur.gs : cur.gf) : null;
-      const golP = prev ? (isP ? prev.gs : prev.gf) : null;
-      if (golC != null || golP != null) {
-        bits.push((isP ? 'GS ' : 'G ') + (golC != null ? golC : '–') + (golP != null ? ' (' + golP + ')' : ''));
-      }
-      if (cur && g > 0) bits.push('TIT ' + Math.round(100 * cur.pv / g) + '%');
-      const affordable = p.qtA <= maxBid;
 
-      const item = el('div', { class: 'suggest-item', onclick: () => { closeSuggestModal(); openAuctionModal(p, team.id); } },
-        el('div', { class: 'role-badge ' + p.role, style: 'width:24px;height:24px;font-size:11px;' }, p.role),
-        el('div', { style: 'flex:1;min-width:0;' },
-          el('div', { class: 's-name' }, p.name + (affordable ? '' : ' ⚠')),
-          el('div', { class: 's-stats' }, bits.length ? bits.join(' · ') : (p.teamSerieA || '—'))
-        ),
-        el('div', { class: 's-qta mono' }, 'Qt.A ' + p.qtA)
-      );
-      block.appendChild(item);
+    // Riserve a poco (buona media, prezzo basso)
+    const low = pool.filter(p => p.qtA <= 6);
+    low.sort((a, b) => (playerSortValue(b, 'tit') - playerSortValue(a, 'tit')) || (playerSortValue(b, 'fm') - playerSortValue(a, 'fm')));
+    const lowTop = low.slice(0, 5);
+    if (lowTop.length) {
+      block.appendChild(el('div', { class: 'suggest-sub' }, 'Riserve a poco — buona media, costano 1-6cr'));
+      for (const p of lowTop) block.appendChild(suggestItem(p, team, g));
     }
     body.appendChild(block);
   }

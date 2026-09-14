@@ -601,7 +601,7 @@
       <div class="players-toolbar">
         <input type="search" class="search" id="player-search" placeholder="Cerca giocatore…" />
         <select class="sort-select" id="player-sort" title="Ordina la lista">
-          <option value="qta">Ordina: Qt.A</option>
+          <option value="qta">Ordina: Prezzo medio (500)</option>
           <option value="fm">Ordina: Fantamedia</option>
           <option value="gf">Ordina: Gol (in corso)</option>
           <option value="gfprev">Ordina: Gol (anno scorso)</option>
@@ -706,7 +706,7 @@
         <div class="player-name" id="mod-name">-</div>
         <div class="player-meta" id="mod-meta">-</div>
       </div>
-      <div class="qta-badge">Qt.A <span id="mod-qta">-</span></div>
+      <div class="qta-badge" title="Crediti medi spesi in aste da 500">Media 500 <span id="mod-qta">-</span></div>
     </div>
 
     <div id="mod-stats"></div>
@@ -1301,7 +1301,7 @@ function renderPlayers() {
     const card = el('div', { class: 'player-card' + titCardClass(p), onclick: () => openAuctionModal(p) },
       el('div', { class: 'role-badge ' + p.role }, p.role),
       playerInfoEl(p),
-      el('div', { class: 'qta-badge mono' }, String(p.qtA))
+      priceBadge(p)
     );
     list.appendChild(card);
   }
@@ -1510,7 +1510,7 @@ function openAuctionModal(player, presetTeamId) {
   $('#mod-role').className = 'role-badge ' + player.role;
   $('#mod-name').textContent = player.name;
   $('#mod-meta').textContent = ROLE_LABEL[player.role].replace(/i$/, 'e') + ' — ' + (player.teamSerieA || '—');
-  $('#mod-qta').textContent = player.qtA;
+  { const v = marketPrice500(player); $('#mod-qta').textContent = (v != null) ? v : (state.market ? '—' : player.qtA); }
   renderModalStats(player);
   renderSpendAdvice(player);
   const priceInput = $('#mod-price');
@@ -1709,7 +1709,7 @@ function renderPickPlayerList() {
     } },
       el('div', { class: 'role-badge ' + p.role }, p.role),
       playerInfoEl(p),
-      el('div', { class: 'qta-badge mono' }, String(p.qtA))
+      priceBadge(p)
     );
     container.appendChild(card);
   }
@@ -2203,7 +2203,7 @@ function playerSortValue(p, by) {
     case 'gf':     return cur ? cur.gf : -1;
     case 'gfprev': return prev ? prev.gf : -1;
     case 'tit':    return (cur && g > 0) ? cur.pv / g : -1;
-    default:       return p.qtA;
+    default: { const v = marketPrice500(p); return v != null ? v : p.qtA; } // 'qta' = prezzo medio, fallback Qt.A
   }
 }
 function sortPlayers(arr) {
@@ -2325,9 +2325,10 @@ function renderModalStats(p) {
 //  PREZZI & POPOLARITÀ D'ASTA  (CSV "i più comprati") + PIANO ROSA
 // ============================================================
 // Ripartizione budget per reparto (base 500) — dipende dal n. di partecipanti (fonte: Fantacalcio Online)
+// P alzata perché il portiere titolare top (es. Svilar) va pagato ~50; extra preso da C e un filo da D
 const SPLIT_ANCHORS = {
-  8:  { P: 0.070, D: 0.15, C: 0.250, A: 0.53 },
-  10: { P: 0.075, D: 0.16, C: 0.245, A: 0.52 }
+  8:  { P: 0.105, D: 0.140, C: 0.225, A: 0.530 },
+  10: { P: 0.105, D: 0.155, C: 0.225, A: 0.515 }
 };
 function splitForTeams(n) {
   const a = SPLIT_ANCHORS[8], b = SPLIT_ANCHORS[10];
@@ -2337,7 +2338,58 @@ function splitForTeams(n) {
   for (const r of ROLE_ORDER) raw[r] /= sum;               // normalizza a 1
   return raw;
 }
-const STRONG_TARGETS = { P: 1, D: 3, C: 4, A: 3 };          // "forti" per reparto (il resto = riserve a poco)
+// Titolari di movimento per reparto: si parte dal 3-4-3 e si vira col mercato (P sempre 1)
+const BASE_STARTERS = { D: 3, C: 4, A: 3 };
+const ROLE_MIN_ST = { D: 3, C: 3, A: 1 };
+const ROLE_MAX_ST = { D: 5, C: 5, A: 3 };
+// Titolari-obiettivo per reparto. Base 3-4-3. Si vira verso un altro modulo SOLO quando
+// SPENDO più del budget consigliato in un ruolo (non se prendo forti in saldo). 10 titolari di movimento.
+function formationTargets(team) {
+  const B = ca().initialBudget || DEFAULT_BUDGET;
+  const base = splitForTeams(ca().teams.length);            // quote base 3-4-3 per n. partecipanti
+  const perStarter = {                                      // costo-per-titolare atteso nel modulo base
+    D: base.D * B / BASE_STARTERS.D,
+    C: base.C * B / BASE_STARTERS.C,
+    A: base.A * B / BASE_STARTERS.A
+  };
+  const spent = { D: 0, C: 0, A: 0 };
+  for (const r of ['D', 'C', 'A']) spent[r] = team.players.filter(p => p.role === r).reduce((s, p) => s + (p.price || 0), 0);
+  const paid = {}, t = {};
+  for (const r of ['D', 'C', 'A']) {
+    paid[r] = Math.round(spent[r] / perStarter[r]);         // titolari "pagati" (per non tagliare sotto)
+    const extra = Math.floor(Math.max(0, spent[r] - base[r] * B) / perStarter[r]); // scatta solo oltre il budget di reparto
+    t[r] = Math.min(ROLE_MAX_ST[r], Math.max(BASE_STARTERS[r], BASE_STARTERS[r] + extra));
+  }
+  let total = t.D + t.C + t.A, guard = 0;
+  while (total > 10 && guard++ < 30) {                      // taglia dai reparti con più margine, mai sotto i titolari pagati
+    let best = null, bestMargin = 0;
+    for (const r of ['A', 'D', 'C']) {
+      const floor = Math.max(ROLE_MIN_ST[r], Math.min(paid[r], ROLE_MAX_ST[r]));
+      const margin = t[r] - floor;
+      if (margin > bestMargin) { bestMargin = margin; best = r; }
+    }
+    if (!best) break;
+    t[best]--; total--;
+  }
+  guard = 0;
+  while (total < 10 && guard++ < 30) {                      // raro: riempi verso attacco/cc
+    let best = null, bestRoom = 0;
+    for (const r of ['A', 'C', 'D']) { const room = ROLE_MAX_ST[r] - t[r]; if (room > bestRoom) { bestRoom = room; best = r; } }
+    if (!best) break;
+    t[best]++; total++;
+  }
+  return { P: 1, D: t.D, C: t.C, A: t.A };
+}
+function moduleName(t) { return t.D + '-' + t.C + '-' + t.A; }
+// Split budget adattato al modulo: peso-per-titolare (dallo split base) applicato ai titolari correnti
+function splitForPlan(team) {
+  const base = splitForTeams(ca().teams.length);           // base 3-4-3 per n. partecipanti
+  const t = formationTargets(team);
+  const wD = base.D / BASE_STARTERS.D, wC = base.C / BASE_STARTERS.C, wA = base.A / BASE_STARTERS.A;
+  const raw = { D: t.D * wD, C: t.C * wC, A: t.A * wA };
+  const k = (1 - base.P) / (raw.D + raw.C + raw.A);
+  return { P: base.P, D: raw.D * k, C: raw.C * k, A: raw.A * k, targets: t, formation: moduleName(t) };
+}
 
 // Normalizzazione forte per il match dei nomi (cognome concatenato, solo alfanumerico)
 function norm2(s) {
@@ -2444,6 +2496,19 @@ function marketFor(p) {
   _marketCache.set(ck, best);
   return best;
 }
+// Crediti medi spesi in aste da 500 (dal listino) — null se non disponibile
+function marketPrice500(p) {
+  const m = marketFor(p);
+  return (m && m.p500 != null) ? Math.round(m.p500) : null;
+}
+// Badge prezzo a destra del giocatore: crediti medi (aste 500); se il listino non è caricato ripiega su Qt.A
+function priceBadge(p) {
+  const v = marketPrice500(p);
+  const txt = (v != null) ? String(v) : (state.market ? '—' : String(p.qtA));
+  const title = (v != null) ? 'Crediti medi spesi (aste da 500)'
+    : (state.market ? 'Prezzo medio non disponibile' : 'Qt.A — carica il listino prezzi per il credito medio');
+  return el('div', { class: 'qta-badge mono', title }, txt);
+}
 function renderMarketStatus() {
   const box = $('#market-status'), clearBtn = $('#btn-clear-market');
   if (!box) return;
@@ -2463,14 +2528,14 @@ function renderMarketStatus() {
 // Piano rosa per una squadra: budget per reparto, "forti" vs riserve, ridimensionato sugli acquisti
 function rosterPlan(team) {
   const B = ca().initialBudget || DEFAULT_BUDGET;
-  const split = splitForTeams(ca().teams.length);
-  const plan = {};
+  const sp = splitForPlan(team);
+  const plan = { _formation: sp.formation };
   for (const r of ROLE_ORDER) {
     const inRole = team.players.filter(p => p.role === r);
     const bought = inRole.length;
     const spent = inRole.reduce((s, p) => s + (p.price || 0), 0);
-    const target = Math.round(split[r] * B);
-    const strong = STRONG_TARGETS[r], fillers = SLOTS[r] - strong;
+    const target = Math.round(sp[r] * B);
+    const strong = sp.targets[r], fillers = SLOTS[r] - strong;
     const strongBought = Math.min(bought, strong);   // i più costosi contano come "forti"
     const fillerBought = bought - strongBought;
     const strongLeft = Math.max(0, strong - strongBought);
@@ -2497,6 +2562,51 @@ function roleStrategyText(r) {
   if (r === 'C') return '4 forti + riserve';
   if (r === 'A') return '1 top · o 1 forte+2 medi · o 3 medi';
   return '1 titolare + 2 riserve';
+}
+
+// Valore (in crediti scalati) di un giocatore disponibile, per stimare domanda/offerta del reparto
+function playerValueCr(q) {
+  const scale = (ca().initialBudget || DEFAULT_BUDGET) / 500;
+  const m = marketFor(q);
+  return ((m && m.p500 != null) ? m.p500 : q.qtA) * scale;
+}
+// Fattore concorrenza (0.7–1.2): considera crediti/slot dei RIVALI e i big ancora disponibili nel reparto.
+// Alto = rivali ricchi + pochi buoni rimasti (devi spingere); basso = poca concorrenza o tante alternative.
+function competitionFactor(p, team, V) {
+  const r = p.role;
+  const scale = (ca().initialBudget || DEFAULT_BUDGET) / 500;
+  const others = ca().teams.filter(t => t.id !== team.id);
+  if (!others.length) return { mult: 1, rivalNeed: 0, rivalCanAfford: 0, goodLeft: 0, rivalCredits: 0, note: null };
+  const needing = others.filter(t => teamRoleCount(t, r) < SLOTS[r]);
+  const rivalNeed = needing.length;
+  const rivalCanAfford = needing.filter(t => maxBidForTeam(t) >= V).length;
+  const rivalCredits = others.reduce((s, t) => s + teamBudget(t), 0);
+  // alternative disponibili almeno ~buone quanto lui (incluso lui)
+  let goodLeft = 1;
+  const thr = 0.7 * V;
+  for (const q of ca().players) {
+    if (q.assigned || q.role !== r || q.id === p.id) continue;
+    if (playerValueCr(q) >= thr) goodLeft++;
+  }
+  const pressure = rivalCanAfford / goodLeft;               // domanda solvibile / offerta buona
+  // Attacco: sui big d'attacco i rivali possono spingersi quasi a tutto il budget → pendenza e tetto più alti
+  const isA = r === 'A';
+  const slope = isA ? 0.50 : 0.30;
+  const capHi = isA ? 1.5 : 1.2;
+  let base = Math.max(0.7, Math.min(capHi, 0.7 + slope * pressure));
+  const Vbase = V / scale;                                  // riporta a scala 500
+  const weight = Math.max(0, Math.min(1, (Vbase - 5) / 25)); // conta solo su semitop/top, non sui low
+  const mult = Math.max(0.7, Math.min(capHi, 1 + weight * (base - 1)));
+  let note = null;
+  if (weight > 0.15) {
+    if (mult >= 1.08) {
+      note = isA
+        ? 'Big d\u2019attacco conteso: i rivali possono spingersi quasi a tutto il budget (' + rivalCanAfford + ' rivali, ' + goodLeft + ' top rimasti) → alza'
+        : 'Reparto conteso: ' + rivalCanAfford + ' rivali possono spingere, ' + goodLeft + ' big rimasti → alza';
+    }
+    else if (mult <= 0.92) note = 'Poca concorrenza (' + rivalCanAfford + ' rivali, ' + goodLeft + ' alternative) → puoi risparmiare';
+  }
+  return { mult, rivalNeed, rivalCanAfford, goodLeft, rivalCredits, note };
 }
 
 // ---------- Consiglio di spesa per la MIA squadra ----------
@@ -2566,7 +2676,9 @@ function spendAdvice(p, team) {
   const scale = B / 500;                         // prezzi/Qt.A sono tarati su un budget classico da 500
   const roleFull = teamRoleCount(team, p.role) >= SLOTS[p.role];
   const cap = maxBidForTeam(team);               // tetto: lascia ≥1 credito per ogni altro slot
-  const plan = rosterPlan(team)[p.role];
+  const fullPlan = rosterPlan(team);
+  const plan = fullPlan[p.role];
+  const formation = fullPlan._formation;
   const pot = playerPotential(p);
   const reasons = pot.reasons.slice();
 
@@ -2577,7 +2689,7 @@ function spendAdvice(p, team) {
   if (market != null) {
     let hype = 1.0; // il prezzo di mercato è gonfiato dall'hype: lo tempero con titolarità/rendimento
     if (pot.titPct != null) { if (pot.titPct < 0.4) hype *= 0.7; else if (pot.titPct < 0.6) hype *= 0.9; else if (pot.titPct >= 0.85) hype *= 1.03; }
-    if (pot.blendFM != null) { if (pot.blendFM >= 7) hype *= 1.03; else if (pot.blendFM < 5.8) hype *= 0.9; }
+    if (p.role !== 'P' && pot.blendFM != null) { if (pot.blendFM >= 7) hype *= 1.03; else if (pot.blendFM < 5.8) hype *= 0.9; } // i portieri hanno FM bassa per natura: non penalizzarli
     hype = Math.max(0.6, Math.min(1.0, hype)); // mai sopra il prezzo medio di mercato (è già un tetto)
     valore = Math.max(1, Math.round(market * hype));
     basis = 'mercato';
@@ -2586,13 +2698,18 @@ function spendAdvice(p, team) {
     basis = 'listino';
   }
 
+  // Fattore concorrenza (crediti/slot dei rivali vs big rimasti nel reparto)
+  const comp = competitionFactor(p, team, valore);
+  const valoreComp = Math.max(1, Math.round(valore * comp.mult));
+  if (comp.note) reasons.push(comp.note);
+
   const planMax = planMaxForPlayer(team, p.role, plan);
   const asFiller = plan.strongLeft <= 0 && plan.slotsLeft > 0;
-  const suggested = Math.max(1, Math.min(valore, planMax, cap));
-  const limitedBy = suggested < valore ? (planMax <= cap ? 'piano' : 'budget') : null;
+  const suggested = Math.max(1, Math.min(valoreComp, planMax, cap));
+  const limitedBy = suggested < valoreComp ? (planMax <= cap ? 'piano' : 'budget') : null;
 
   return {
-    team, valore, basis, suggested, roleFull, cap, plan,
+    team, valore, valoreComp, basis, suggested, roleFull, cap, plan, comp, formation,
     market: market != null ? Math.round(market) : null,
     comprato: m ? m.comprato : null,
     asFiller, limitedBy, reasons
@@ -2628,18 +2745,17 @@ function renderSpendAdvice(p) {
   if (adv.comprato != null) mbits.push('comprato dal ' + fmt(adv.comprato, 1) + '%' + (adv.comprato >= 15 ? ' 🔥' : ''));
   box.appendChild(el('div', { class: 'adv-market' }, mbits.join(' · ')));
 
+  if (adv.comp && adv.comp.rivalNeed > 0) {
+    const c = adv.comp;
+    box.appendChild(el('div', { class: 'adv-plan' },
+      'Concorrenza ' + p.role + ': ' + c.rivalCanAfford + '/' + c.rivalNeed + ' rivali possono competere · big rimasti ' + c.goodLeft + ' · crediti rivali ' + c.rivalCredits + 'cr'));
+  }
+
   const pl = adv.plan;
   const planEl = el('div', { class: 'adv-plan' },
-    'Piano ' + p.role + ': ' + pl.spent + '/' + pl.target + 'cr · restano ' + pl.strongLeft + ' big + ' + pl.fillerLeft + ' low');
+    'Piano ' + p.role + ' (mod. ' + adv.formation + '): ' + pl.spent + '/' + pl.target + 'cr · restano ' + pl.strongLeft + ' big + ' + pl.fillerLeft + ' low');
   if (adv.limitedBy) planEl.appendChild(el('span', {}, ' · limitato dal ' + adv.limitedBy));
   box.appendChild(planEl);
-
-  box.appendChild(el('button', { class: 'btn secondary adv-use', onclick: () => {
-    const pi = $('#mod-price');
-    pi.value = adv.suggested;
-    pi.dispatchEvent(new Event('input', { bubbles: true }));
-    pi.focus();
-  } }, 'Imposta come prezzo'));
 }
 
 // ---------- Consigli "completa la rosa" ----------
@@ -2671,7 +2787,7 @@ function suggestItem(p, team, g) {
   const m = marketFor(p);
   if (m && m.comprato != null) bits.push('👥 ' + fmt(m.comprato, 0) + '%');
   const adv = spendAdvice(p, team);
-  const priceRight = (m && m.p500 != null) ? ('~' + Math.round(m.p500) + 'cr') : ('Qt.A ' + p.qtA);
+  const priceRight = (m && m.p500 != null) ? ('~' + Math.round(m.p500) + 'cr') : (state.market ? '—' : ('Qt.A ' + p.qtA));
   return el('div', { class: 'suggest-item', onclick: () => { closeSuggestModal(); openAuctionModal(p, team.id); } },
     el('div', { class: 'role-badge ' + p.role, style: 'width:24px;height:24px;font-size:11px;' }, p.role),
     el('div', { style: 'flex:1;min-width:0;' },
@@ -2693,7 +2809,7 @@ function renderSuggestBody(team) {
   const nTeams = ca().teams.length;
 
   body.appendChild(el('div', { style: 'font-size:11px;color:var(--muted);margin-bottom:6px;' },
-    'Piano su ' + nTeams + ' squadre · budget ' + (ca().initialBudget || DEFAULT_BUDGET) + 'cr'));
+    'Piano su ' + nTeams + ' squadre · budget ' + (ca().initialBudget || DEFAULT_BUDGET) + 'cr · modulo ' + plan._formation));
 
   // Riepilogo piano: speso/target e big/low residui per reparto
   const grid = el('div', { class: 'sg-plan' });
